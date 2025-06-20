@@ -2,7 +2,4 @@
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^README\.Rmd$
-^dev$
-^data-raw$
-^data$
-^inst$
+^CODE_OF_CONDUCT\.md$

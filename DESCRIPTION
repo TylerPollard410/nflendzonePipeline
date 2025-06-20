@@ -7,9 +7,29 @@ Description: Provides data processing, transformation, and ETL scripts for
     the EndZone Analytics ecosystem. Outputs ready-to-use datasets as
     Parquet files for downstream analysis and app consumption.
 License: MIT + file LICENSE
+URL: https://github.com/TylerPollard410/nflendzonePipeline
+BugReports: https://github.com/TylerPollard410/nflendzonePipeline/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Suggests: 
-    testthat (>= 3.0.0)
-Config/testthat/edition: 3
+Imports: 
+    arrow,
+    DBI,
+    dplyr,
+    duckdb,
+    duckdbfs,
+    future,
+    glue,
+    nflfastR,
+    nflreadr,
+    nflseedR,
+    piggyback,
+    progressr,
+    purrr,
+    readr,
+    slider,
+    stats,
+    stringr,
+    tibble,
+    tidyr,
+    tidyselect
