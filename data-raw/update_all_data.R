@@ -17,6 +17,7 @@ library(purrr)
 library(stringr)
 library(lubridate)
 library(piggyback)
+library(tidyr)
 library(nflreadr)
 # ...add any more you need
 
@@ -170,6 +171,7 @@ if (full_build || should_rebuild(game_data, prior_data, id_col = "season")) {
   cat("[season_standings] No new seasons, using prior archive.\n")
   full_data <- prior_data
 }
+save_and_upload(tag, full_data, seasons_to_process, github_data_repo, archive_dir)
 
 
 # ---------------------------------------------------------------------------- #
@@ -279,6 +281,7 @@ if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season"))
     game_long_df = game_data_long,
     pbp_df = pbp_data,
     seasons = all_seasons,
+    stats_loc = "artifacts/data-archive/nfl_stats_week.rda",
     sum_level = "week",
     stat_level = "team",
     season_level = "REG+POST",
@@ -303,7 +306,7 @@ if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season"))
   full_data <- compute_series_data(
     game_long_df = game_data_long,
     pbp_df = pbp_data,
-    seasons = all_seasons,
+    series_loc = "artifacts/data-archive/nfl_series_week.rda",
     recompute_all = FALSE
   )
 } else {
@@ -323,9 +326,7 @@ if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season"))
   cat("[turnover] Recomputing turnover data...\n")
   full_data <- compute_turnover_data(
     game_long_df = game_data_long,
-    pbp_df = pbp_data,
-    seasons = all_seasons,
-    recompute_all = FALSE
+    pbp_df = pbp_data
   )
 } else {
   cat("[turnover] No new seasons in game_data_long, using prior archive.\n")
@@ -344,9 +345,7 @@ if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season"))
   cat("[redzone] Recomputing redzone data...\n")
   full_data <- compute_redzone_data(
     game_long_df = game_data_long,
-    pbp_df = pbp_data,
-    seasons = all_seasons,
-    recompute_all = FALSE
+    pbp_df = pbp_data
   )
 } else {
   cat("[redzone] No new seasons in game_data_long, using prior archive.\n")
