@@ -49,57 +49,6 @@ needed_tags <- c(
 # ============================================================================ #
 purrr::walk(needed_tags, ~ piggyback::pb_new_release(repo = github_data_repo, tag = .x))
 
-# ============================================================================ #
-# INCREMENTAL/ARCHIVE LOGIC HELPERS ----
-# ============================================================================ #
-# Helper to decide if a recompute is needed based on source/prior data (by season).
-# should_rebuild <- function(source_df, prior_df, id_col = "season") {
-#   if (is.null(prior_df)) return(TRUE)
-#   max_source <- suppressWarnings(max(source_df[[id_col]], na.rm = TRUE))
-#   max_prior  <- suppressWarnings(max(prior_df[[id_col]], na.rm = TRUE))
-#   isTRUE(max_source > max_prior)
-# }
-
-# Universal save and upload helper for full/per-season, all formats, with timestamps.
-# save_and_upload <- function(tag, full_data, seasons, repo, archive_dir, upload = TRUE) {
-#   dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
-#   # Save all-seasons archive
-#   saveRDS(full_data, file.path(archive_dir, paste0(tag, ".rds")))
-#   write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
-#   arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
-#   # Timestamps (nflverse style)
-#   ts_txt <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
-#   ts_json <- paste0('{",\n  "updated": "', ts_txt, '"\n}\n')
-#   writeLines(ts_txt, file.path(archive_dir, "timestamp.txt"))
-#   writeLines(ts_json, file.path(archive_dir, "timestamp.json"))
-#   if (upload) {
-#     piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".rds")), repo = repo, tag = tag)
-#     piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".csv")), repo = repo, tag = tag)
-#     piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".parquet")), repo = repo, tag = tag)
-#     piggyback::pb_upload(file.path(archive_dir, "timestamp.txt"), repo = repo, tag = tag)
-#     piggyback::pb_upload(file.path(archive_dir, "timestamp.json"), repo = repo, tag = tag)
-#   }
-#   # Per-season files (temp for upload only)
-#   season_files <- purrr::map(seasons, \(season) {
-#     season_df <- full_data |> filter(season == !!season)
-#     pq_path  <- file.path(tempdir(), paste0(tag, "_", season, ".parquet"))
-#     rds_path <- file.path(tempdir(), paste0(tag, "_", season, ".rds"))
-#     csv_path <- file.path(tempdir(), paste0(tag, "_", season, ".csv"))
-#     arrow::write_parquet(season_df, pq_path)
-#     saveRDS(season_df, rds_path)
-#     write_csv(season_df, csv_path)
-#     list(parquet = pq_path, rds = rds_path, csv = csv_path)
-#   })
-#   if (upload) {
-#     purrr::walk(season_files, \(filelist) {
-#       piggyback::pb_upload(filelist$parquet, repo = repo, tag = tag)
-#       piggyback::pb_upload(filelist$rds,     repo = repo, tag = tag)
-#       piggyback::pb_upload(filelist$csv,     repo = repo, tag = tag)
-#     })
-#   }
-#   invisible(TRUE)
-# }
-
 
 # ============================================================================ #
 # NFLVERSE RELEASES ----
@@ -149,39 +98,6 @@ player_offense_data <- compute_player_data(
 )
 
 
-# ---------------------------------------------------------------------------- #
-### nflverse_stats ----
-cat("%%%% Generating/Loading nflverse week_team_all stats %%%%\n")
-
-nfl_stats_spec <- list(
-  sum_level    = "week",
-  stat_level   = "team",
-  season_level = "ALL"
-)
-stats_path <- make_stats_filename(nfl_stats_spec)
-prior_stats <- if (file.exists(stats_path)) readRDS(stats_path) else NULL
-
-if (full_build) {
-  cat("[nflverse_stats] Full rebuild: recalculating all weekly team stats...\n")
-  nflStatsWeek <- compute_nflverse_stats(
-    seasons = all_seasons,
-    spec = nfl_stats_spec,
-    prior_stats = NULL    # Ignore prior_stats for full rebuild
-  )
-} else {
-  cat("[nflverse_stats] Incremental update: checking for new seasons...\n")
-  nflStatsWeek <- compute_nflverse_stats(
-    seasons = all_seasons,
-    spec = nfl_stats_spec,
-    prior_stats = prior_stats
-  )
-}
-
-dir.create(dirname(stats_path), recursive = TRUE, showWarnings = FALSE)
-saveRDS(nflStatsWeek, stats_path)
-
-
-
 
 # ============================================================================ #
 ## Calculated/Derived Data ====
@@ -195,7 +111,7 @@ archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
-if (full_build || should_rebuild(game_data, prior_data, id_col = "season")) {
+if (full_build || should_rebuild(game_data, prior_data, id_cols = "season")) {
   cat("[season_standings] Recomputing standings...\n")
   full_data <- compute_season_standings_data(
     game_df = game_data,
@@ -236,7 +152,7 @@ if (full_build || is.null(prior_data)) {
     reset = TRUE,
     print_message = TRUE
   )
-} else if (should_rebuild(game_data, prior_data, id_col = "season")) {
+} else if (should_rebuild(game_data, prior_data, id_cols = "season")) {
   # INCREMENTAL: Only update current season
   cat("[weekly_standings] Incrementally updating current season...\n")
   # All previous seasons from archive
@@ -292,7 +208,7 @@ if (full_build || is.null(prior_data)) {
     prior_data = NULL,
     verbose = TRUE
   )
-} else if (should_rebuild(game_data, prior_data, id_col = c("season", "week"))) {
+} else if (should_rebuild(game_data, prior_data, id_cols = c("season", "week"))) {
   cat("[elo] Incrementally updating ELO data...\n")
   full_data <- compute_elo_data(
     game_df = game_data |> dplyr::filter(!is.na(result)),
@@ -412,7 +328,7 @@ if (full_build || is.null(prior_data)) {
   cat("[epa] Incrementally updating EPA data for seasons: ",
       paste(seasons_to_process, collapse = ", "), "...\n")
   # Drop prior data for seasons being updated
-  prior_data_no_update <- prior_data |> dplyr::filter(!season %in% seasons_to_process)
+  prior_data_no_update <- prior_data |> dplyr::filter(!(season %in% seasons_to_process))
   # Recompute only for those seasons
   new_epa_data <- compute_epa_data(
     pbp_df = pbp_data |> dplyr::filter(season %in% seasons_to_process),
@@ -437,7 +353,6 @@ save_and_upload(
 
 
 # ---------------------------------------------------------------------------- #
-# ---------------------------------------------------------------------------- #
 ### scores ----
 cat("%%%% Generating scores %%%%\n")
 tag <- "scores"
@@ -445,16 +360,30 @@ archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
-# Always use the nflStatsWeek loaded earlier in the script (from nflverse_stats block)
-if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season")) {
-  cat("[scores] Recomputing scores...\n")
+if (full_build || is.null(prior_data)) {
+  cat("[scores] Full rebuild of scores data...\n")
   full_data <- compute_scores_data(
     game_long_df = game_data_long,
     pbp_df       = pbp_data,
-    nflStatsWeek = nflStatsWeek
+    season_proc = seasons_to_process,
+    sum_level = "week",
+    stat_level = "team",
+    season_level = "ALL"
+  )
+} else if (should_rebuild(game_data_long,
+                          prior_data,
+                          id_cols = c("season", "week", "game_id"))) {
+  cat("[scores] Incrementally updating scores data...\n")
+  full_data <- compute_scores_data(
+    game_long_df = game_data_long,
+    pbp_df       = pbp_data,
+    season_proc = seasons_to_process,
+    sum_level = "week",
+    stat_level = "team",
+    season_level = "ALL"
   )
 } else {
-  cat("[scores] No new seasons in game_data_long, using prior archive.\n")
+  cat("[scores] No update needed. Using prior archive.\n")
   full_data <- prior_data
 }
 
@@ -474,19 +403,38 @@ tag <- "series"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
-if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season")) {
-  cat("[series] Recomputing series data...\n")
+
+if (full_build || is.null(prior_data)) {
+  cat("[series] Full rebuild of series data...\n")
   full_data <- compute_series_data(
-    game_long_df = game_data_long,
-    pbp_df = pbp_data,
-    series_loc = "artifacts/data-archive/nfl_series_week.rda",
-    recompute_all = FALSE
+    pbp_df = pbp_data |> dplyr::filter(season %in% seasons_to_process),
+    weekly = TRUE
   )
+} else if (should_rebuild(pbp_data |> dplyr::filter(season %in% seasons_to_process),
+                          prior_data,
+                          id_cols = c("season", "week", "game_id"))) {
+  cat("[series] Incrementally updating series data for seasons: ",
+      paste(seasons_to_process, collapse = ", "), "...\n")
+  # Drop prior data for seasons being updated
+  prior_data_no_update <- prior_data |> dplyr::filter(!(season %in% seasons_to_process))
+  # Recompute only for those seasons
+  new_series_data <- compute_series_data(
+    pbp_df = pbp_data |> dplyr::filter(season %in% seasons_to_process),
+    weekly = TRUE
+  )
+  full_data <- dplyr::bind_rows(prior_data_no_update, new_series_data)
 } else {
-  cat("[series] No new seasons in game_data_long, using prior archive.\n")
+  cat("[series] No new games in pbp_data, using prior archive.\n")
   full_data <- prior_data
 }
-save_and_upload(tag, full_data, seasons_to_process, github_data_repo, archive_dir)
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir
+)
 
 # ---------------------------------------------------------------------------- #
 ### turnover ----
@@ -495,7 +443,8 @@ tag <- "turnover"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
-if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season")) {
+
+if (full_build || should_rebuild(game_data_long, prior_data, id_cols = c("season", "week", "game_id"))) {
   cat("[turnover] Recomputing turnover data...\n")
   full_data <- compute_turnover_data(
     game_long_df = game_data_long,
@@ -505,7 +454,14 @@ if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season"))
   cat("[turnover] No new seasons in game_data_long, using prior archive.\n")
   full_data <- prior_data
 }
-save_and_upload(tag, full_data, seasons_to_process, github_data_repo, archive_dir)
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir
+)
 
 # ---------------------------------------------------------------------------- #
 ### redzone ----
@@ -514,7 +470,8 @@ tag <- "redzone"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
-if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season")) {
+
+if (full_build || should_rebuild(game_data_long, prior_data, c("season", "week", "game_id"))) {
   cat("[redzone] Recomputing redzone data...\n")
   full_data <- compute_redzone_data(
     game_long_df = game_data_long,
@@ -524,7 +481,14 @@ if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season"))
   cat("[redzone] No new seasons in game_data_long, using prior archive.\n")
   full_data <- prior_data
 }
-save_and_upload(tag, full_data, seasons_to_process, github_data_repo, archive_dir)
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir
+)
 
 
 
@@ -532,6 +496,141 @@ cat("\n%%%% DATA UPDATE COMPLETE %%%%\n")
 
 
 
+
+# ---------------------------------------------------------------------------- #
+# ### nflverse_stats ---- #
+# cat("%%%% Generating/Loading nflverse week_team_all stats %%%%\n")
+#
+# nfl_stats_spec <- list(
+#   sum_level    = "week",
+#   stat_level   = "team",
+#   season_level = "ALL"
+# )
+# stats_path <- make_stats_filename(nfl_stats_spec)
+# prior_stats <- if (file.exists(stats_path)) readRDS(stats_path) else NULL
+#
+# if (full_build) {
+#   cat("[nflverse_stats] Full rebuild: recalculating all weekly team stats...\n")
+#   nflStatsWeek <- compute_nflverse_stats(
+#     seasons = all_seasons,
+#     spec = nfl_stats_spec,
+#     prior_stats = NULL    # Ignore prior_stats for full rebuild
+#   )
+# } else {
+#   cat("[nflverse_stats] Incremental update: checking for new seasons...\n")
+#   nflStatsWeek <- compute_nflverse_stats(
+#     seasons = all_seasons,
+#     spec = nfl_stats_spec,
+#     prior_stats = prior_stats
+#   )
+# }
+#
+# dir.create(dirname(stats_path), recursive = TRUE, showWarnings = FALSE)
+# saveRDS(nflStatsWeek, stats_path)
+
+# # ---------------------------------------------------------------------------- #
+# ### scores ---- #
+# cat("%%%% Generating scores %%%%\n")
+# tag <- "scores"
+# archive_dir <- file.path("artifacts/data-archive", tag)
+# full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+# prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+#
+# # Always use the nflStatsWeek loaded earlier in the script (from nflverse_stats block)
+# if (full_build || should_rebuild(game_data_long, prior_data, id_col = "season")) {
+#   cat("[scores] Recomputing scores...\n")
+#   full_data <- compute_scores_data(
+#     game_long_df = game_data_long,
+#     pbp_df       = pbp_data,
+#     nflStatsWeek = nflStatsWeek
+#   )
+# } else {
+#   cat("[scores] No new seasons in game_data_long, using prior archive.\n")
+#   full_data <- prior_data
+# }
+#
+# save_and_upload(
+#   tag         = tag,
+#   full_data   = full_data,
+#   seasons     = seasons_to_process,
+#   repo        = github_data_repo,
+#   archive_dir = archive_dir
+# )
+
+# ---------------------------------------------------------------------------- #
+# ### series_week ---- #
+# cat("%%%% Generating series conversion rates weekly %%%%\n")
+# tag <- "nflverse_series"
+# archive_dir <- file.path("artifacts/data-archive", tag)
+# series_weekly <- TRUE  # set FALSE if you want season summary
+# full_rds_path <- if(series_weekly) {
+#   file.path(archive_dir, paste0(tag, "_week.rds"))
+# } else {
+#   file.path(archive_dir, paste0(tag,  "_season.rds"))
+# }
+# prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+#
+# if (full_build || is.null(prior_data)) {
+#   cat("[nflverse_series] Full rebuild of series conversion rates... \n")
+#   full_data <- progressr::with_progress({
+#     calculate_series_conversion_rates(
+#       pbp = pbp_data,
+#       weekly = series_weekly
+#     )
+#   }) |> arrange(season, week, team)
+# } else {
+#   cat("[nflverse_series] Partial rebuild of series conversion rates... \n")
+#   partial_data <- progressr::with_progress({
+#     calculate_series_conversion_rates(
+#       pbp = pbp_data |> filter(season %in% seasons_to_process),
+#       weekly = series_weekly
+#     )
+#   })
+#   full_data <- bind_rows(
+#     prior_data |> filter(!(season %in% seasons_to_process)),
+#     partial_data
+#   ) |> arrange(season, week, team)
+# }
+#
+# dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
+# saveRDS(full_data, full_rds_path)
+#
+# ### nflverse_series ---- #
+# cat("%%%% Generating nflverse series conversion rates %%%%\n")
+# tag <- "nflverse_series"
+# archive_dir <- file.path("artifacts/data-archive", tag)
+# series_weekly <- TRUE  # set FALSE if you want season summary
+# full_rds_path <- if(series_weekly) {
+#   file.path(archive_dir, paste0(tag, "_week.rds"))
+# } else {
+#   file.path(archive_dir, paste0(tag,  "_season.rds"))
+# }
+# prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+#
+# if (full_build || is.null(prior_data)) {
+#   cat("[nflverse_series] Full rebuild of series conversion rates... \n")
+#   full_data <- progressr::with_progress({
+#     calculate_series_conversion_rates(
+#       pbp = pbp_data,
+#       weekly = series_weekly
+#     )
+#   }) |> arrange(season, week, team)
+# } else {
+#   cat("[nflverse_series] Partial rebuild of series conversion rates... \n")
+#   partial_data <- progressr::with_progress({
+#     calculate_series_conversion_rates(
+#       pbp = pbp_data |> filter(season %in% seasons_to_process),
+#       weekly = series_weekly
+#     )
+#   })
+#   full_data <- bind_rows(
+#     prior_data |> filter(!(season %in% seasons_to_process)),
+#     partial_data
+#   ) |> arrange(season, week, team)
+# }
+#
+# dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
+# saveRDS(full_data, full_rds_path)
 
 # # ============================================================================ #
 # # season_standings ---- #

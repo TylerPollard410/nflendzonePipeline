@@ -55,7 +55,8 @@ compute_turnover_data <- function(game_long_df = game_data_long,
       turnoverData |>
         select(game_id, posteam, all_of(turnover_cols)),
       by = join_by(game_id, team == posteam)
-    )
+    ) |>
+    add_nflverse_ids()
 
   return(turnoverFeatures)
 }

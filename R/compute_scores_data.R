@@ -1,21 +1,35 @@
-#' Compute comprehensive score features for modeling (uses precomputed nflStatsWeek)
+#' Compute comprehensive score features for modeling (uses precomputed nflverse_stats_week_team_all)
 #'
 #' @param game_long_df Tibble of long-format game-team rows (game_id, season, week, team, etc)
 #' @param pbp_df       Play-by-play tibble containing two-point conversion info
-#' @param nflStatsWeek Precomputed weekly stats data frame (from compute_nflverse_stats), not a file path!
+#' @param season_proc  Integer vector of seasons to process (all_seasons or just current_season)
+#' @param sum_level    Summary level (e.g. "week")
+#' @param stat_level   Stat level (e.g. "team")
+#' @param season_level Season level ("ALL", "REG", "POST")
 #' @return Tibble with one row per game-team containing efficiency and score features
 #' @export
 #' @noRd
 compute_scores_data <- function(
     game_long_df,
     pbp_df,
-    nflStatsWeek
+    season_proc,
+    sum_level,
+    stat_level,
+    season_level
 ) {
-  # identifier columns for gameDataLong
   id_cols <- c("game_id", "season", "week", "team")
 
+  # Pull precomputed stats (uses all cache/checking logic internally!)
+  nflverse_stats_week_team_all <- calc_nflverse_stats(
+    game_long_df       = game_long_df,
+    sum_level          = sum_level,
+    stat_level         = stat_level,
+    season_level       = season_level,
+    season_proc = season_proc
+  )
+
   # STEP 1: Select raw scoring stats
-  scoresData <- nflStatsWeek |>
+  scoresData <- nflverse_stats_week_team_all |>
     dplyr::select(
       season, week, team,
       passing_tds,
@@ -32,7 +46,7 @@ compute_scores_data <- function(
       safeties_def = def_safeties
     )
 
-  # STEP 2: Fix known data errors
+  # STEP 2: Fix known data errors (manual corrections for problematic games)
   det_2011_13 <- scoresData$season == 2011 & scoresData$week == 13 & scoresData$team == "DET"
   scoresData$rushing_tds[det_2011_13] <- 1
   scoresData$pat_att[det_2011_13]     <- 2
@@ -83,7 +97,7 @@ compute_scores_data <- function(
       .groups     = "drop"
     )
 
-  # Join two-point stats
+  # Join two-point stats. Defensive stats must be paired with the opponent, so we reverse in mutate below.
   scoresDataAgg <- scoresDataAgg |>
     dplyr::left_join(
       scores_two_pt_df,
@@ -95,6 +109,7 @@ compute_scores_data <- function(
     dplyr::filter(!is.na(result)) |>
     dplyr::select(all_of(id_cols)) |>
     dplyr::left_join(scoresDataAgg, by = dplyr::join_by(season, week, team)) |>
+    # Defensive 2pt conversions: assign to opposing team
     dplyr::mutate(
       two_pt_def = rev(two_pt_def),
       .by        = c(game_id)

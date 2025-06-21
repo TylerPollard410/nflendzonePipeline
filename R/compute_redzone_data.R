@@ -64,7 +64,8 @@ compute_redzone_data <- function(game_long_df = game_data_long,
     select(all_of(id_cols)) |>
     left_join(redzone_features, by = id_cols) |>
     mutate(across(starts_with("off_"),  ~ replace_na(.x, 0)),
-           across(starts_with("def_"),  ~ replace_na(.x, 0)))
+           across(starts_with("def_"),  ~ replace_na(.x, 0))) |>
+    add_nflverse_ids()
 
   return(redzone_data)
 }
