@@ -9,6 +9,20 @@ Description: Provides data processing, transformation, and ETL scripts for
 License: MIT + file LICENSE
 URL: https://github.com/TylerPollard410/nflendzonePipeline
 BugReports: https://github.com/TylerPollard410/nflendzonePipeline/issues
+Imports: 
+    arrow,
+    dplyr,
+    future,
+    nflfastR,
+    nflreadr,
+    nflseedR,
+    piggyback,
+    progressr,
+    purrr,
+    readr,
+    tibble,
+    tidyr,
+    tidyselect
 Config/testthat/edition: 3
 Encoding: UTF-8
 Language: en-US

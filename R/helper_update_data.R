@@ -26,6 +26,7 @@ should_rebuild <- function(source_df, prior_df, id_cols = c("season", "week", "g
 #' @param upload      Logical: upload to GitHub Releases? (default: TRUE)
 #' @return Invisibly TRUE
 #' @keywords internal
+#' @noRd
 save_and_upload <- function(
     tag, full_data, seasons, repo, archive_dir, upload = TRUE
 ) {
@@ -119,6 +120,7 @@ season_type_for_nflfastR <- function(season_level) {
 #' @param schedules Optionally supply pre-loaded schedules for efficiency
 #' @return Data frame with all canonical id columns and then original columns
 #' @export
+#' @noRd
 add_nflverse_ids <- function(df, preserve_order = FALSE, schedules = NULL) {
   if (is.null(schedules)) schedules <- nflreadr::load_schedules()
   wide_map <- schedules |>
