@@ -1,6 +1,8 @@
 
 packrat::clean()
 
+devtools::document()
+
 roxygen2::roxygenise()
 
 attachment::att_amend_desc()
