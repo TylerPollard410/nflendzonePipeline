@@ -36,8 +36,12 @@ start_season <- 2006
 current_season <- get_current_season()
 all_seasons <- start_season:current_season
 github_data_repo <- "TylerPollard410/nflendzoneData"
-full_build <- TRUE # Set FALSE for incremental update
+
+# Get full_build flag from command line argument or default to FALSE
+args <- commandArgs(trailingOnly = TRUE)
+full_build <- if (length(args) > 0) as.logical(args[1]) else FALSE # Set FALSE for incremental update
 seasons_to_process <- if (full_build) all_seasons else current_season
+
 needed_tags <- c(
   "season_standings", "weekly_standings", "elo", "srs", "epa", "scores",
   "series", "turnover", "redzone", "model_data_long", "model_data"
@@ -47,7 +51,9 @@ needed_tags <- c(
 # ============================================================================ #
 # ENSURE ALL RELEASE TAGS EXIST IN GITHUB DATA REPO ----
 # ============================================================================ #
-purrr::walk(needed_tags, ~ piggyback::pb_new_release(repo = github_data_repo, tag = .x))
+suppressWarnings({
+  purrr::walk(needed_tags, ~ piggyback::pb_new_release(repo = github_data_repo, tag = .x))
+})
 
 
 # ============================================================================ #
@@ -131,6 +137,7 @@ save_and_upload(
   repo        = github_data_repo,
   archive_dir = archive_dir
 )
+
 
 
 # ---------------------------------------------------------------------------- #

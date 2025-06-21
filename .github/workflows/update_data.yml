@@ -1,0 +1,36 @@
+name: Update EndZone Data
+
+on:
+  schedule:
+    # 8:00 UTC is 4:00 AM US Eastern during standard time, covers NFL season
+    - cron: '0 8 * 9,10,11,12 *'   # September–December
+    - cron: '0 8 * 1,2 *'          # January–February
+  workflow_dispatch:
+    inputs:
+      full_build:
+        description: 'Run a full build (TRUE) or incremental (FALSE)?'
+        required: false
+        default: 'FALSE'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.PUSH_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PUSH_TOKEN }}
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+      - name: Install dependencies
+        run: |
+          Rscript -e 'install.packages(c(
+          "arrow", "dplyr", "readr", "purrr",
+          "stringr", "lubridate", "piggyback", "tidyr",
+          "nflreadr", "nflfastR", "devtools"
+          ))'
+      - name: Run ETL pipeline
+        run: |
+          Rscript data-raw/update_all_data.R ${{ github.event.inputs.full_build }}

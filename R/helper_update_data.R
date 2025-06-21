@@ -30,39 +30,48 @@ save_and_upload <- function(
     tag, full_data, seasons, repo, archive_dir, upload = TRUE
 ) {
   dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
-  saveRDS(full_data, file.path(archive_dir, paste0(tag, ".rds")))
-  readr::write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
-  arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
-  ts_txt <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
-  ts_json <- paste0('{\n  "updated": "', ts_txt, '"\n}\n')
-  writeLines(ts_txt, file.path(archive_dir, "timestamp.txt"))
-  writeLines(ts_json, file.path(archive_dir, "timestamp.json"))
+  suppressWarnings({
+    saveRDS(full_data, file.path(archive_dir, paste0(tag, ".rds")))
+    readr::write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
+    arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
+    ts_txt <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
+    ts_json <- paste0('{\n  "updated": "', ts_txt, '"\n}\n')
+    writeLines(ts_txt, file.path(archive_dir, "timestamp.txt"))
+    writeLines(ts_json, file.path(archive_dir, "timestamp.json"))
+  })
   if (upload) {
-    piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".rds")), repo = repo, tag = tag)
-    piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".csv")), repo = repo, tag = tag)
-    piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".parquet")), repo = repo, tag = tag)
-    piggyback::pb_upload(file.path(archive_dir, "timestamp.txt"), repo = repo, tag = tag)
-    piggyback::pb_upload(file.path(archive_dir, "timestamp.json"), repo = repo, tag = tag)
+    suppressWarnings({
+      piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".rds")), repo = repo, tag = tag)
+      piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".csv")), repo = repo, tag = tag)
+      piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".parquet")), repo = repo, tag = tag)
+      piggyback::pb_upload(file.path(archive_dir, "timestamp.txt"), repo = repo, tag = tag)
+      piggyback::pb_upload(file.path(archive_dir, "timestamp.json"), repo = repo, tag = tag)
+    })
     season_files <- purrr::map(seasons, \(season) {
       season_df <- full_data |> dplyr::filter(season == !!season)
       pq_path  <- file.path(tempdir(), paste0(tag, "_", season, ".parquet"))
       rds_path <- file.path(tempdir(), paste0(tag, "_", season, ".rds"))
       csv_path <- file.path(tempdir(), paste0(tag, "_", season, ".csv"))
-      arrow::write_parquet(season_df, pq_path)
-      saveRDS(season_df, rds_path)
-      readr::write_csv(season_df, csv_path)
+      suppressWarnings({
+        arrow::write_parquet(season_df, pq_path)
+        saveRDS(season_df, rds_path)
+        readr::write_csv(season_df, csv_path)
+      })
       list(parquet = pq_path, rds = rds_path, csv = csv_path)
     })
     purrr::walk(season_files, \(filelist) {
-      piggyback::pb_upload(filelist$parquet, repo = repo, tag = tag)
-      piggyback::pb_upload(filelist$rds,     repo = repo, tag = tag)
-      piggyback::pb_upload(filelist$csv,     repo = repo, tag = tag)
+      suppressWarnings({
+        piggyback::pb_upload(filelist$parquet, repo = repo, tag = tag)
+        piggyback::pb_upload(filelist$rds,     repo = repo, tag = tag)
+        piggyback::pb_upload(filelist$csv,     repo = repo, tag = tag)
+      })
       unlink(c(filelist$parquet, filelist$rds, filelist$csv))
     })
     gc()
   }
   invisible(TRUE)
 }
+
 
 #' Build a canonical filename for cached stats/data (configurable directory)
 #'
