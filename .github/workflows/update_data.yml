@@ -2,7 +2,7 @@ name: Update EndZone Data
 
 on:
   schedule:
-    # 8:00 UTC is 4:00 AM US Eastern during standard time, covers NFL season
+    # 8:00 UTC is 4:00 AM US Eastern (NFL season)
     - cron: '0 8 * 9,10,11,12 *'   # September–December
     - cron: '0 8 * 1,2 *'          # January–February
   workflow_dispatch:
@@ -32,8 +32,11 @@ jobs:
         run: |
           Rscript -e 'install.packages(c("arrow", "dplyr", "readr", "purrr",
           "stringr", "lubridate", "piggyback", "tidyr",
-          "nflreadr", "nflfastR", "devtools"))'
-          Rscript -e 'install.packages(".", repos = NULL, type = "source")'
+          "nflreadr", "nflfastR"))'
+      - name: Build and install pipeline package
+        run: |
+          R CMD build .
+          R CMD INSTALL *.tar.gz
       - name: Run ETL pipeline
         run: |
           Rscript data-raw/update_all_data.R ${{ github.event.inputs.full_build }}

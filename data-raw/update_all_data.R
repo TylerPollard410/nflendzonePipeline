@@ -20,14 +20,14 @@ library(piggyback)
 library(tidyr)
 library(nflreadr)
 library(nflfastR)
-# ...add any more you need
+library(nflendzonePipeline)
 
 # ============================================================================ #
 # LOAD PIPELINE FUNCTIONS ----
 # ============================================================================ #
-if (requireNamespace("devtools", quietly = TRUE)) {
-  devtools::load_all()
-}
+# if (requireNamespace("devtools", quietly = TRUE)) {
+#   devtools::load_all()
+# }
 
 # ============================================================================ #
 # GLOBAL VARIABLES ----
