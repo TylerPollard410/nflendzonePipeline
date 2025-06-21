@@ -33,6 +33,7 @@ jobs:
           Rscript -e 'install.packages(c("arrow", "dplyr", "readr", "purrr",
           "stringr", "lubridate", "piggyback", "tidyr",
           "nflreadr", "nflfastR", "devtools"))'
+          Rscript -e 'install.packages(".", repos = NULL, type = "source")'
       - name: Run ETL pipeline
         run: |
           Rscript data-raw/update_all_data.R ${{ github.event.inputs.full_build }}
