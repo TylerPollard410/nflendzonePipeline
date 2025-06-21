@@ -1,40 +1,22 @@
-
-#' Compute comprehensive score features for modeling
+#' Compute comprehensive score features for modeling (uses precomputed nflStatsWeek)
 #'
-#' @param game_long_df Tibble of long-format game-team rows including game_id, season, week, team, home_away, team_score, opponent_score
-#' @param pbp_df      Play-by-play tibble containing two-point conversion info
-#' @param seasons   Integer vector of all seasons
-#' @param stats_loc    File path for nflStatsWeek RDA
-#' @param recompute_all Logical, if TRUE forces weekly stats recompute
+#' @param game_long_df Tibble of long-format game-team rows (game_id, season, week, team, etc)
+#' @param pbp_df       Play-by-play tibble containing two-point conversion info
+#' @param nflStatsWeek Precomputed weekly stats data frame (from compute_nflverse_stats), not a file path!
 #' @return Tibble with one row per game-team containing efficiency and score features
 #' @export
 #' @noRd
-compute_scores_data <- function(game_long_df = game_data_long,
-                                pbp_df = pbp_data,
-                                seasons = all_seasons,
-                                sum_level = "week",
-                                stat_level = "team",
-                                season_level = "REG+POST",
-                                stats_loc,
-                                recompute_all = FALSE) {
-  # uses dplyr
-
+compute_scores_data <- function(
+    game_long_df,
+    pbp_df,
+    nflStatsWeek
+) {
   # identifier columns for gameDataLong
   id_cols <- c("game_id", "season", "week", "team")
 
-  # STEP 1: Load or generate weekly team stats
-  nflStatsWeek <- calc_weekly_team_stats(
-    seasons = seasons,
-    sum_level = "week",
-    stat_level = "team",
-    season_level = "REG+POST",
-    stats_loc,
-    recompute_all = FALSE
-  )
-
-  # STEP 2: Select raw scoring stats
+  # STEP 1: Select raw scoring stats
   scoresData <- nflStatsWeek |>
-    select(
+    dplyr::select(
       season, week, team,
       passing_tds,
       rushing_tds,
@@ -50,7 +32,7 @@ compute_scores_data <- function(game_long_df = game_data_long,
       safeties_def = def_safeties
     )
 
-  # STEP 3: Fix known data errors
+  # STEP 2: Fix known data errors
   det_2011_13 <- scoresData$season == 2011 & scoresData$week == 13 & scoresData$team == "DET"
   scoresData$rushing_tds[det_2011_13] <- 1
   scoresData$pat_att[det_2011_13]     <- 2
@@ -71,30 +53,30 @@ compute_scores_data <- function(game_long_df = game_data_long,
   scoresData$pat_att[cle_2019_15]     <- 3
   scoresData$pat_made[cle_2019_15]    <- 3
 
-  # STEP 4: Aggregate scores
+  # STEP 3: Aggregate scores
   scoresDataAgg <- scoresData |>
-    mutate(across(-all_of(c("season", "week", "team")), ~ replace_na(.x, 0))) |>
-    mutate(
+    dplyr::mutate(across(-c(season, week, team), ~ tidyr::replace_na(.x, 0))) |>
+    dplyr::mutate(
       td_off   = passing_tds + rushing_tds,
       td_def   = def_tds + fumble_recovery_tds,
       td_total = td_off + td_special + td_def
     )
 
-  # STEP 5: Two-point conversion data
+  # STEP 4: Two-point conversion data
   scores_two_pt_df <- pbp_df |>
-    select(
+    dplyr::select(
       season, week, posteam,
       defensive_two_point_conv,
       two_point_attempt, two_point_conv_result
     ) |>
-    filter(!is.na(posteam)) |>
-    mutate(
+    dplyr::filter(!is.na(posteam)) |>
+    dplyr::mutate(
       two_pt_att  = two_point_attempt,
       two_pt_made = as.integer(two_point_conv_result == "success"),
       two_pt_def  = defensive_two_point_conv
     ) |>
-    group_by(season, week, posteam) |>
-    summarise(
+    dplyr::group_by(season, week, posteam) |>
+    dplyr::summarise(
       two_pt_att  = sum(two_pt_att, na.rm = TRUE),
       two_pt_made = sum(two_pt_made, na.rm = TRUE),
       two_pt_def  = sum(two_pt_def, na.rm = TRUE),
@@ -103,22 +85,22 @@ compute_scores_data <- function(game_long_df = game_data_long,
 
   # Join two-point stats
   scoresDataAgg <- scoresDataAgg |>
-    left_join(
+    dplyr::left_join(
       scores_two_pt_df,
-      by = join_by(season, week, team == posteam)
+      by = dplyr::join_by(season, week, team == posteam)
     )
 
-  # STEP 6: Combine with gameDataLong and compute point breakdowns
+  # STEP 5: Combine with gameDataLong and compute point breakdowns
   scoresFeatures <- game_long_df |>
-    filter(!is.na(result)) |>
-    select(all_of(id_cols)) |>
-    left_join(scoresDataAgg, by = join_by(season, week, team)) |>
-    mutate(
+    dplyr::filter(!is.na(result)) |>
+    dplyr::select(all_of(id_cols)) |>
+    dplyr::left_join(scoresDataAgg, by = dplyr::join_by(season, week, team)) |>
+    dplyr::mutate(
       two_pt_def = rev(two_pt_def),
       .by        = c(game_id)
     ) |>
-    mutate(across(-all_of(id_cols), ~ replace_na(.x, 0))) |>
-    mutate(
+    dplyr::mutate(across(-all_of(id_cols), ~ tidyr::replace_na(.x, 0))) |>
+    dplyr::mutate(
       points8      = two_pt_made,
       points7      = pat_made,
       points6      = td_total - two_pt_made - pat_made,
@@ -129,7 +111,3 @@ compute_scores_data <- function(game_long_df = game_data_long,
 
   return(scoresFeatures)
 }
-
-# Example usage:
-# stats_loc   <- "~/Desktop/NFLAnalysisTest/scripts/UpdateData/PriorData/nflStatsWeek.rda"
-# scores_data <- compute_scores_data(gameDataLong, pbpData, allSeasons, stats_loc, recompute_all=TRUE)
