@@ -30,24 +30,22 @@ calc_nflverse_stats <- function(
 
   rebuild_needed <- is.null(prior_stats) ||
     should_rebuild(
-      source_df = game_long_df,
+      source_df = game_long_df |> filter(!is.na(result)),
       prior_df  = prior_stats,
       id_cols   = c("season", "week", "team")
     )
 
   if (rebuild_needed) {
     season_type <- season_type_for_nflfastR(season_level)
-    new_stats <- progressr::with_progress({
-      nflfastR::calculate_stats(
-        seasons       = season_proc,
-        summary_level = sum_level,
-        stat_type     = stat_level,
-        season_type   = season_type
-      )
-    })
+    new_stats <- nflfastR::calculate_stats(
+      seasons       = season_proc,
+      summary_level = sum_level,
+      stat_type     = stat_level,
+      season_type   = season_type
+    )
 
     if (!is.null(prior_stats)) {
-      prior_stats <- prior_stats |> filter(!season %in% season_proc)
+      prior_stats <- prior_stats |> filter(!(season %in% season_proc))
       all_stats <- dplyr::bind_rows(prior_stats, new_stats)
     } else {
       all_stats <- new_stats

@@ -25,7 +25,7 @@ compute_scores_data <- function(
     sum_level          = sum_level,
     stat_level         = stat_level,
     season_level       = season_level,
-    season_proc = season_proc
+    season_proc        = season_proc
   )
 
   # STEP 1: Select raw scoring stats

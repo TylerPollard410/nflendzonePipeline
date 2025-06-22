@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           Rscript -e 'install.packages(c(
-            "arrow", "dplyr", "readr", "purrr",
+            "arrow", "glue", "dplyr", "readr", "purrr",
             "stringr", "lubridate", "piggyback", "tidyr",
             "nflreadr", "nflfastR", "nflseedR"
           ))'
