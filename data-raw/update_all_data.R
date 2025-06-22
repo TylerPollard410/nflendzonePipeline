@@ -20,6 +20,7 @@ library(piggyback)
 library(tidyr)
 library(nflreadr)
 library(nflfastR)
+library(nflseedR)
 library(nflendzonePipeline)
 
 # ============================================================================ #
