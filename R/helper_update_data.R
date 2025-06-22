@@ -25,7 +25,7 @@ should_rebuild <- function(source_df, prior_df, id_cols = c("season", "week", "g
 #' @param archive_dir Local directory for archive
 #' @param upload      Logical: upload to GitHub Releases? (default: TRUE)
 #' @return Invisibly TRUE
-#' @keywords internal
+#' @export
 #' @noRd
 save_and_upload <- function(
     tag, full_data, seasons, repo, archive_dir, upload = TRUE
