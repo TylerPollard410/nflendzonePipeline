@@ -24,6 +24,8 @@ compute_feature_long <- function(
   #   cat("\n")
   # })
 
+  feature_data[[3]] <- feature_data[[3]] |> dplyr::select(-home_team, -away_team)
+
   feature_list_with_ids <- purrr::imap(feature_data, \(df, name) {
     message(glue::glue("Adding nflverse IDs to '{name}'..."))
     add_nflverse_ids(df)
