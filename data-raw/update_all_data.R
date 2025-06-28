@@ -8,7 +8,7 @@
 # the release asset. If that also fails, a full rebuild is triggered.
 
 # ============================================================================ #
-# LIBRARIES ----
+# 1. LIBRARIES ----
 # ============================================================================ #
 #detach("package:nflendzonePipeline",unload = TRUE, force = TRUE)
 #install.packages(".", repos = NULL, type = "source")
@@ -27,19 +27,22 @@ library(nflseedR)
 library(nflendzonePipeline)
 
 # ============================================================================ #
-# LOAD PIPELINE FUNCTIONS ----
+# 2. LOAD PIPELINE FUNCTIONS ----
 # ============================================================================ #
 # if (requireNamespace("devtools", quietly = TRUE)) {
 #   devtools::load_all()
 # }
 
 # ============================================================================ #
-# GLOBAL VARIABLES ----
+# 3. GLOBAL VARIABLES ----
 # ============================================================================ #
 start_season <- 2006
 current_season <- get_current_season()
 all_seasons <- start_season:current_season
 github_data_repo <- "TylerPollard410/nflendzoneData"
+github_releases_base_url <- paste0("https://github.com/",
+                                   github_data_repo,
+                                   "/releases/download/")
 
 # Get full_build flag from command line argument or default to FALSE
 args <- commandArgs(trailingOnly = TRUE)
@@ -48,6 +51,10 @@ full_build <- if (length(args) > 0) as.logical(args[1]) else FALSE # Set FALSE f
 seasons_to_process <- if (full_build) all_seasons else current_season
 
 needed_tags <- c(
+  # nflverse
+  "nfl_stats_week_team_regpost",
+  "nfl_stats_week_player_regpost",
+  # Derived
   "season_standings",
   "weekly_standings",
   "elo",
@@ -57,23 +64,25 @@ needed_tags <- c(
   "series",
   "turnover",
   "redzone",
-  "feature_data_long",
-  #"feature_data",
-  #"model_data_long",
-  "model_data"
-  # Add/remove as needed
+  # Modeling
+  "team_features",
+  "team_model_data",
+  "game_model_data"
 )
 
 # ============================================================================ #
-# ENSURE ALL RELEASE TAGS EXIST IN GITHUB DATA REPO ----
+# 4. RELEASE TAGS EXIST IN GITHUB DATA REPO ----
 # ============================================================================ #
 suppressWarnings({
-  purrr::walk(needed_tags, ~ piggyback::pb_new_release(repo = github_data_repo, tag = .x))
+  purrr::walk(needed_tags,
+              ~ piggyback::pb_new_release(repo = github_data_repo,
+                                          tag = .x)
+  )
 })
 
 
 # ============================================================================ #
-# NFLVERSE RELEASES ----
+# NFLVERSE RELEASES ---
 # ============================================================================ #
 # (for future incremental logic)
 # Uncomment the next line if you want to pre-cache these releases now
@@ -82,35 +91,36 @@ suppressWarnings({
 
 
 # ============================================================================ #
-# DATA GENERATION BLOCKS ----
+# 5. DATA GENERATION ----
 # ============================================================================ #
 
-# ============================================================================ #
-## nflverse Source Data ====
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
+## nflverse =======================
+
+### Source Data -----
 # (always rebuild, no incremental logic needed)
 
 # ---------------------------------------------------------------------------- #
-### game_data ----
+#### game_data ----
 cat("%%%% Generating game_data %%%%\n")
 game_data <- compute_game_data(seasons = all_seasons)
 
 # ---------------------------------------------------------------------------- #
-### game_data_long ----
+#### game_data_long ----
 cat("%%%% Generating game_data_long %%%%\n")
 game_data_long <- compute_game_data_long(game_df = game_data)
 
 # ---------------------------------------------------------------------------- #
-### pbp_data ----
+#### pbp_data ----
 cat("%%%% Generating pbp_data %%%%\n")
 pbp_data <- compute_pbp_data(seasons = all_seasons)
 
 
-
 # ============================================================================ #
-## nflverse Function Data ====
+### Stats Data ====
 
 # ---------------------------------------------------------------------------- #
-### player_offense_data ----
+#### player_offense_data ----
 cat("%%%% Generating player_offense_data %%%%\n")
 player_offense_data <- compute_player_data(
   seasons = all_seasons,
@@ -119,8 +129,179 @@ player_offense_data <- compute_player_data(
 )
 
 
+# ---------------------------------------------------------------------------- #
+#### nfl_stats_week_team_regpost ----
+cat("%%%% Generating nfl_stats_week_team_regpost %%%%\n")
+tag <- "nfl_stats_week_team_regpost"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
-# ============================================================================ #
+if (full_build || is.null(prior_data)) {
+  # FULL REBUILD
+  cat("[nfl_stats_week_team_regpost] Recomputing ALL weekly team REG+POST stats...\n")
+  full_data <- calculate_stats(
+    seasons = all_seasons,
+    summary_level = "week",
+    stat_type = "team",
+    season_type = "REG+POST"
+  )
+} else if (should_rebuild(game_data |> filter(!is.na(result)),
+                          prior_data,
+                          id_cols = c("season", "week"))) {
+  # INCREMENTAL: Only update current season
+  cat("[nfl_stats_week_team_regpost] Incrementally updating current season...\n")
+  # All previous seasons from archive
+  prev_data <- prior_data |> filter(season < current_season)
+  # Current season from latest games
+  curr_season_data <- game_data |> filter(season == current_season)
+  # Optionally: skip if no new weeks/games
+  if (nrow(curr_season_data) == 0) {
+    cat("[nfl_stats_week_team_regpost] No current season games. Using prior archive.\n")
+    full_data <- prior_data
+  } else {
+    current_data <- calculate_stats(
+      seasons = current_season,
+      summary_level = "week",
+      stat_type = "team",
+      season_type = "REG+POST"
+    )
+    full_data <- bind_rows(prev_data, current_data)
+  }
+} else {
+  # NO UPDATE NEEDED
+  cat("[nfl_stats_week_team_regpost] No new data. Using prior archive.\n")
+  full_data <- prior_data
+}
+
+full_data <- full_data |> add_nflverse_ids()
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir
+)
+
+
+# ---------------------------------------------------------------------------- #
+#### nfl_stats_week_player_regpost ----
+cat("%%%% Generating nfl_stats_week_player_regpost %%%%\n")
+tag <- "nfl_stats_week_player_regpost"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+
+if (full_build || is.null(prior_data)) {
+  # FULL REBUILD
+  cat("[nfl_stats_week_player_regpost] Recomputing ALL weekly team REG+POST stats...\n")
+  full_data <- calculate_stats(
+    seasons = all_seasons,
+    summary_level = "week",
+    stat_type = "player",
+    season_type = "REG+POST"
+  )
+} else if (should_rebuild(game_data |> filter(!is.na(result)),
+                          prior_data,
+                          id_cols = c("season", "week"))) {
+  # INCREMENTAL: Only update current season
+  cat("[nfl_stats_week_player_regpost] Incrementally updating current season...\n")
+  # All previous seasons from archive
+  prev_data <- prior_data |> filter(season < current_season)
+  # Current season from latest games
+  curr_season_data <- game_data |> filter(season == current_season)
+  # Optionally: skip if no new weeks/games
+  if (nrow(curr_season_data) == 0) {
+    cat("[nfl_stats_week_player_regpost] No current season games. Using prior archive.\n")
+    full_data <- prior_data
+  } else {
+    current_data <- calculate_stats(
+      seasons = current_season,
+      summary_level = "week",
+      stat_type = "player",
+      season_type = "REG+POST"
+    )
+    full_data <- bind_rows(prev_data, current_data)
+  }
+} else {
+  # NO UPDATE NEEDED
+  cat("[nfl_stats_week_player_regpost] No new data. Using prior archive.\n")
+  full_data <- prior_data
+}
+
+full_data <- full_data |> add_nflverse_ids()
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir
+)
+
+
+# ---------------------------------------------------------------------------- #
+#### nfl_stats_season_team_regpost ----
+cat("%%%% Generating nfl_stats_season_team_regpost %%%%\n")
+tag <- "nfl_stats_season_team_regpost"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+
+if (full_build || is.null(prior_data)) {
+  # FULL REBUILD
+  cat("[nfl_stats_season_team_regpost] Recomputing ALL season team REG+POST stats...\n")
+  full_data <- calculate_stats(
+    seasons = all_seasons,
+    summary_level = "season",
+    stat_type = "team",
+    season_type = "REG+POST"
+  )
+} else if (should_rebuild(game_data |> filter(!is.na(result)),
+                          prior_data,
+                          id_cols = c("season", "week"))) {
+  # INCREMENTAL: Only update current season
+  cat("[nfl_stats_season_team_regpost] Incrementally updating current season...\n")
+  # All previous seasons from archive
+  prev_data <- prior_data |> filter(season < current_season)
+  # Current season from latest games
+  curr_season_data <- game_data |> filter(season == current_season)
+  # Optionally: skip if no new weeks/games
+  if (nrow(curr_season_data) == 0) {
+    cat("[nfl_stats_season_team_regpost] No current season games. Using prior archive.\n")
+    full_data <- prior_data
+  } else {
+    current_data <- calculate_stats(
+      seasons = current_season,
+      summary_level = "season",
+      stat_type = "team",
+      season_type = "REG+POST"
+    )
+    full_data <- bind_rows(prev_data, current_data)
+  }
+} else {
+  # NO UPDATE NEEDED
+  cat("[nfl_stats_season_team_regpost] No new data. Using prior archive.\n")
+  full_data <- prior_data
+}
+
+full_data <- full_data |> add_nflverse_ids()
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir
+)
+
+
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 ## Calculated/Derived Data ====
 # (incremental logic, archive)
 
@@ -520,18 +701,18 @@ save_and_upload(
 
 
 # ============================================================================ #
-## Aggregated Data ====
+## Modeling Data ====
 # (built completely from prior data)
 
 
 # ---------------------------------------------------------------------------- #
-### feature_data_long ----
-tag <- "feature_long"
+### team_features ----
+tag <- "team_features"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
-full_data <- compute_feature_long(
+full_data <- compute_team_features(
   features = c("elo", "srs", "epa", "scores", "series", "redzone", "turnover")
 )
 
@@ -544,15 +725,15 @@ save_and_upload(
 )
 
 # ---------------------------------------------------------------------------- #
-### feature_data ----
+### game_features ----
 
 
 # ---------------------------------------------------------------------------- #
-### model_data_long ----
+### team_model ----
 
 
 # ---------------------------------------------------------------------------- #
-### model_data ----
+### game_model ----
 
 
 
