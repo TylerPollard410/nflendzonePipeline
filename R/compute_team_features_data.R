@@ -47,5 +47,16 @@ compute_team_features_data <- function(
   ) |>
     dplyr::select(-contains("."))
 
-  return(joined_df)
+  team_features_data <- joined_df |>
+    select(-contains("opponent"), -team_score) |>
+    mutate(
+      team_elo_update = team_elo_post - team_elo_pre,
+      .after = team_elo_post
+    ) |>
+    rename(elo_pre = team_elo_pre) |>
+    rename(elo_post = team_elo_post) |>
+    rename(elo_update = team_elo_update) |>
+    add_nflverse_ids()
+
+  return(team_features_data)
 }

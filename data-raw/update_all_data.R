@@ -13,12 +13,14 @@
 #detach("package:nflendzonePipeline",unload = TRUE, force = TRUE)
 #install.packages(".", repos = NULL, type = "source")
 library(arrow)
+library(tibble)
 library(glue)
 library(dplyr)
 library(readr)
 library(purrr)
 library(stringr)
 library(lubridate)
+library(slider)
 library(piggyback)
 library(tidyr)
 library(nflreadr)
@@ -54,6 +56,8 @@ needed_tags <- c(
   # nflverse
   "nfl_stats_week_team_regpost",
   "nfl_stats_week_player_regpost",
+  "nfl_stats_season_team_regpost",
+  "nfl_stats_season_player_regpost",
   # Derived
   "season_standings",
   "weekly_standings",
@@ -66,8 +70,9 @@ needed_tags <- c(
   "redzone",
   # Modeling
   "team_features",
-  "team_model_data",
-  "game_model_data"
+  "game_features",
+  "team_model",
+  "game_model"
 )
 
 # ============================================================================ #
@@ -140,7 +145,7 @@ prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 if (full_build || is.null(prior_data)) {
   # FULL REBUILD
   cat("[nfl_stats_week_team_regpost] Recomputing ALL weekly team REG+POST stats...\n")
-  full_data <- calculate_stats(
+  full_data <- nflfastR::calculate_stats(
     seasons = all_seasons,
     summary_level = "week",
     stat_type = "team",
@@ -152,16 +157,16 @@ if (full_build || is.null(prior_data)) {
   # INCREMENTAL: Only update current season
   cat("[nfl_stats_week_team_regpost] Incrementally updating current season...\n")
   # All previous seasons from archive
-  prev_data <- prior_data |> filter(season < current_season)
+  prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season == current_season)
+  curr_season_data <- game_data |> filter(season %in% seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[nfl_stats_week_team_regpost] No current season games. Using prior archive.\n")
     full_data <- prior_data
   } else {
-    current_data <- calculate_stats(
-      seasons = current_season,
+    current_data <- nflfastR::calculate_stats(
+      seasons = seasons_to_process,
       summary_level = "week",
       stat_type = "team",
       season_type = "REG+POST"
@@ -182,7 +187,9 @@ save_and_upload(
   #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
 )
 
 
@@ -197,7 +204,7 @@ prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 if (full_build || is.null(prior_data)) {
   # FULL REBUILD
   cat("[nfl_stats_week_player_regpost] Recomputing ALL weekly team REG+POST stats...\n")
-  full_data <- calculate_stats(
+  full_data <- nflfastR::calculate_stats(
     seasons = all_seasons,
     summary_level = "week",
     stat_type = "player",
@@ -209,16 +216,16 @@ if (full_build || is.null(prior_data)) {
   # INCREMENTAL: Only update current season
   cat("[nfl_stats_week_player_regpost] Incrementally updating current season...\n")
   # All previous seasons from archive
-  prev_data <- prior_data |> filter(season < current_season)
+  prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season == current_season)
+  curr_season_data <- game_data |> filter(season %in% seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[nfl_stats_week_player_regpost] No current season games. Using prior archive.\n")
     full_data <- prior_data
   } else {
-    current_data <- calculate_stats(
-      seasons = current_season,
+    current_data <- nflfastR::calculate_stats(
+      seasons = seasons_to_process,
       summary_level = "week",
       stat_type = "player",
       season_type = "REG+POST"
@@ -239,7 +246,9 @@ save_and_upload(
   #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
 )
 
 
@@ -254,7 +263,7 @@ prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 if (full_build || is.null(prior_data)) {
   # FULL REBUILD
   cat("[nfl_stats_season_team_regpost] Recomputing ALL season team REG+POST stats...\n")
-  full_data <- calculate_stats(
+  full_data <- nflfastR::calculate_stats(
     seasons = all_seasons,
     summary_level = "season",
     stat_type = "team",
@@ -266,16 +275,16 @@ if (full_build || is.null(prior_data)) {
   # INCREMENTAL: Only update current season
   cat("[nfl_stats_season_team_regpost] Incrementally updating current season...\n")
   # All previous seasons from archive
-  prev_data <- prior_data |> filter(season < current_season)
+  prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season == current_season)
+  curr_season_data <- game_data |> filter(season %in% seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[nfl_stats_season_team_regpost] No current season games. Using prior archive.\n")
     full_data <- prior_data
   } else {
-    current_data <- calculate_stats(
-      seasons = current_season,
+    current_data <- nflfastR::calculate_stats(
+      seasons = seasons_to_process,
       summary_level = "season",
       stat_type = "team",
       season_type = "REG+POST"
@@ -288,7 +297,63 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-full_data <- full_data |> add_nflverse_ids()
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
+)
+
+
+# ---------------------------------------------------------------------------- #
+#### nfl_stats_season_player_regpost ----
+cat("%%%% Generating nfl_stats_season_player_regpost %%%%\n")
+tag <- "nfl_stats_season_player_regpost"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+prior_week_player <- readRDS("artifacts/data-archive/nfl_stats_week_player_regpost/nfl_stats_week_player_regpost.rds")
+
+if (full_build || is.null(prior_data)) {
+  # FULL REBUILD
+  cat("[nfl_stats_season_player_regpost] Recomputing ALL season player REG+POST stats...\n")
+  full_data <- nflfastR::calculate_stats(
+    seasons = all_seasons,
+    summary_level = "season",
+    stat_type = "player",
+    season_type = "REG+POST"
+  )
+} else if (should_rebuild(game_data |> filter(!is.na(result)),
+                          prior_week_player,
+                          id_cols = c("game_id"))) {
+  # INCREMENTAL: Only update current season
+  cat("[nfl_stats_season_player_regpost] Incrementally updating current season...\n")
+  # All previous seasons from archive
+  prev_data <- prior_data |> filter(season < seasons_to_process)
+  # Current season from latest games
+  curr_season_data <- game_data |> filter(season %in% seasons_to_process)
+  # Optionally: skip if no new weeks/games
+  if (nrow(curr_season_data) == 0) {
+    cat("[nfl_stats_season_player_regpost] No current season games. Using prior archive.\n")
+    full_data <- prior_data
+  } else {
+    current_data <- nflfastR::calculate_stats(
+      seasons = seasons_to_process,
+      summary_level = "season",
+      stat_type = "player",
+      season_type = "REG+POST"
+    )
+    full_data <- bind_rows(prev_data, current_data)
+  }
+} else {
+  # NO UPDATE NEEDED
+  cat("[nfl_stats_season_player_regpost] No new data. Using prior archive.\n")
+  full_data <- prior_data
+}
 
 save_and_upload(
   tag         = tag,
@@ -296,9 +361,10 @@ save_and_upload(
   #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
 )
-
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
@@ -313,10 +379,12 @@ archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
-if (full_build || should_rebuild(game_data, prior_data, id_cols = "season")) {
+if (full_build || should_rebuild(game_data |> filter(!is.na(result)),
+                                 prior_data,
+                                 id_cols = "season")) {
   cat("[season_standings] Recomputing standings...\n")
   full_data <- compute_season_standings_data(
-    game_df = game_data,
+    game_df = game_data |> filter(!is.na(result)),
     tol = 1e-3,
     max_iter = 200,
     print_message = TRUE
@@ -329,9 +397,12 @@ if (full_build || should_rebuild(game_data, prior_data, id_cols = "season")) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 
@@ -348,20 +419,22 @@ if (full_build || is.null(prior_data)) {
   # FULL REBUILD
   cat("[weekly_standings] Recomputing ALL weekly standings...\n")
   full_data <- compute_weekly_standings_data(
-    game_df = game_data,
+    game_df = game_data |> filter(!is.na(result)),
     season_type = "ALL",
     tol = 1e-3,
     max_iter = 200,
     reset = TRUE,
     print_message = TRUE
   )
-} else if (should_rebuild(game_data, prior_data, id_cols = "season")) {
+} else if (should_rebuild(game_data |> filter(!is.na(result)),
+                          prior_data,
+                          id_cols = c("season", "week"))) {
   # INCREMENTAL: Only update current season
   cat("[weekly_standings] Incrementally updating current season...\n")
   # All previous seasons from archive
-  prev_data <- prior_data |> filter(season < current_season)
+  prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season == current_season)
+  curr_season_data <- game_data |> filter(season == seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[weekly_standings] No current season games. Using prior archive.\n")
@@ -386,9 +459,12 @@ if (full_build || is.null(prior_data)) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 # ---------------------------------------------------------------------------- #
@@ -405,14 +481,16 @@ if (full_build || is.null(prior_data)) {
     game_df = game_data |> dplyr::filter(!is.na(result)),
     initial_elo = 1500,
     K = 20,
-    home_advantage = 0,
+    home_advantage = 65,
     d = 400,
     apply_margin_multiplier = TRUE,
     season_factor = 0.6,
     prior_data = NULL,
     verbose = TRUE
   )
-} else if (should_rebuild(game_data, prior_data, id_cols = c("season", "week"))) {
+} else if (should_rebuild(game_data |> dplyr::filter(!is.na(result)),
+                          prior_data,
+                          id_cols = c("season", "week"))) {
   cat("[elo] Incrementally updating ELO data...\n")
   full_data <- compute_elo_data(
     game_df = game_data |> dplyr::filter(!is.na(result)),
@@ -433,9 +511,12 @@ if (full_build || is.null(prior_data)) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 
@@ -502,9 +583,12 @@ if (full_build || is.null(prior_data)) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 
@@ -527,7 +611,7 @@ if (full_build || is.null(prior_data)) {
 } else if (should_rebuild(
   pbp_data |> dplyr::filter(season %in% seasons_to_process),
   prior_data,
-  id_cols = "season"
+  id_cols = "game_id"
 )) {
   cat("[epa] Incrementally updating EPA data for seasons: ",
       paste(seasons_to_process, collapse = ", "), "...\n")
@@ -547,12 +631,13 @@ if (full_build || is.null(prior_data)) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
-
-
 
 
 
@@ -563,6 +648,7 @@ tag <- "scores"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+prev_stats <- readRDS("artifacts/data-archive/nfl_stats_week_team_regpost/nfl_stats_week_team_regpost.rds")
 
 if (full_build || is.null(prior_data)) {
   cat("[scores] Full rebuild of scores data...\n")
@@ -572,9 +658,9 @@ if (full_build || is.null(prior_data)) {
     season_proc = all_seasons,
     sum_level = "week",
     stat_level = "team",
-    season_level = "ALL"
+    season_level = "ALL",
+    prev_stats = NULL
   )
-  cat("[scores] COMPLETE Full rebuild of scores data...\n")
 } else if (should_rebuild(game_data_long |> dplyr::filter(!is.na(result)),
                           prior_data,
                           id_cols = c("season", "week", "game_id"))) {
@@ -585,7 +671,8 @@ if (full_build || is.null(prior_data)) {
     season_proc = seasons_to_process,
     sum_level = "week",
     stat_level = "team",
-    season_level = "ALL"
+    season_level = "ALL",
+    prev_stats = prev_stats
   )
 } else {
   cat("[scores] No update needed. Using prior archive.\n")
@@ -595,9 +682,12 @@ if (full_build || is.null(prior_data)) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 
@@ -612,7 +702,7 @@ prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 if (full_build || is.null(prior_data)) {
   cat("[series] Full rebuild of series data...\n")
   full_data <- compute_series_data(
-    pbp_df = pbp_data |> dplyr::filter(season %in% seasons_to_process),
+    pbp_df = pbp_data |> dplyr::filter(season %in% all_seasons),
     weekly = TRUE
   )
 } else if (should_rebuild(pbp_data |> dplyr::filter(season %in% seasons_to_process),
@@ -636,9 +726,12 @@ if (full_build || is.null(prior_data)) {
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 # ---------------------------------------------------------------------------- #
@@ -648,14 +741,14 @@ tag <- "turnover"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+prev_stats <- readRDS("artifacts/data-archive/nfl_stats_week_team_regpost/nfl_stats_week_team_regpost.rds")
 
 if (full_build || should_rebuild(game_data_long |> dplyr::filter(!is.na(result)),
                                  prior_data,
                                  id_cols = c("season", "week", "game_id"))) {
   cat("[turnover] Recomputing turnover data...\n")
   full_data <- compute_turnover_data(
-    game_long_df = game_data_long |> dplyr::filter(!is.na(result)),
-    pbp_df = pbp_data
+    prev_stats_df = prev_stats
   )
 } else {
   cat("[turnover] No new seasons in game_data_long, using prior archive.\n")
@@ -665,9 +758,12 @@ if (full_build || should_rebuild(game_data_long |> dplyr::filter(!is.na(result))
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 # ---------------------------------------------------------------------------- #
@@ -694,9 +790,12 @@ if (full_build || should_rebuild(game_data_long |> dplyr::filter(!is.na(result))
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE
+  #archive_formats = c("rds", "parquet")
 )
 
 
@@ -712,30 +811,127 @@ archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
-full_data <- compute_team_features(
+full_data <- compute_team_features_data(
   features = c("elo", "srs", "epa", "scores", "series", "redzone", "turnover")
 )
 
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
+  #seasons     = all_seasons,
   seasons     = seasons_to_process,
   repo        = github_data_repo,
-  archive_dir = archive_dir
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
 )
 
 # ---------------------------------------------------------------------------- #
 ### game_features ----
+tag <- "game_features"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
+team_features_df <- readRDS("artifacts/data-archive/team_features/team_features.rds")
+
+full_data <- compute_game_features_data(
+  game_data = game_data,
+  team_features_data = team_features_df
+)
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
+)
 
 # ---------------------------------------------------------------------------- #
 ### team_model ----
+tag <- "team_model"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
+full_data <- compute_team_model_data(
+  game_data_long = game_data_long,
+  team_features_data = team_features_df,
+  elo_update_roll_window = 5,
+  feats_roll_window = 5
+)
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
+)
 
 # ---------------------------------------------------------------------------- #
 ### game_model ----
+tag <- "game_model"
+archive_dir <- file.path("artifacts/data-archive", tag)
+full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
+prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
+team_model_df <- readRDS("artifacts/data-archive/team_model/team_model.rds")
 
+full_data <- compute_game_model_data(
+    game_data = game_data,
+    team_model_data = team_model_df,
+    net_configs = list(
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "elo|MOV|SOS|SRS", pattern2 = "elo|MOV|SOS|SRS",
+        fun = `-`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "pfg|OSRS", pattern2 = "pag|DSRS",
+        fun = `-`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "pag|DSRS", pattern2 = "pfg|OSRS",
+        fun = `-`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "(?=.*off)(?=.*epa).*", pattern2 = "(?=.*def)(?=.*epa).*",
+        fun = `+`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "(?=.*off)(?=.*red_zone).*", pattern2 = "(?=.*def)(?=.*red_zone).*",
+        fun = `+`,
+        order_by_team = TRUE
+      )
+    )
+)
+
+save_and_upload(
+  tag         = tag,
+  full_data   = full_data,
+  seasons     = all_seasons,
+  #seasons     = seasons_to_process,
+  repo        = github_data_repo,
+  archive_dir = archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet")
+)
 
 
 

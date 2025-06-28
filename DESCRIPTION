@@ -21,6 +21,8 @@ Imports:
     progressr,
     purrr,
     readr,
+    slider,
+    stringr,
     tibble,
     tidyr,
     tidyselect

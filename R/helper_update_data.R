@@ -16,6 +16,7 @@ should_rebuild <- function(source_df, prior_df, id_cols = c("season", "week", "g
   nrow(missing) > 0
 }
 
+
 #' Save and upload data artifacts (all formats, per-season, with timestamps)
 #'
 #' @param tag         Data tag (used as file/stem and release)
@@ -24,30 +25,51 @@ should_rebuild <- function(source_df, prior_df, id_cols = c("season", "week", "g
 #' @param repo        GitHub repo (username/repo, e.g., "user/repo")
 #' @param archive_dir Local directory for archive
 #' @param upload      Logical: upload to GitHub Releases? (default: TRUE)
+#' @param archive_formats Character vector of formats to save in archive_dir (default: c("rds", "parquet", "csv"))
 #' @return Invisibly TRUE
 #' @export
 #' @noRd
 save_and_upload <- function(
-    tag, full_data, seasons, repo, archive_dir, upload = TRUE
+    tag, full_data, seasons, repo, archive_dir, upload = TRUE,
+    archive_formats = c("rds", "parquet", "csv")
 ) {
+  initial_conn <- as.integer(rownames(showConnections(all = TRUE)))
+  on.exit({
+    final_conn <- as.integer(rownames(showConnections(all = TRUE)))
+    new_conn <- setdiff(final_conn, initial_conn)
+    for (i in new_conn) try(close(getConnection(i)), silent = TRUE)
+  }, add = TRUE)
+
   dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
+
   suppressWarnings({
-    saveRDS(full_data, file.path(archive_dir, paste0(tag, ".rds")))
-    readr::write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
-    arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
+    if ("rds" %in% archive_formats)
+      saveRDS(full_data, file.path(archive_dir, paste0(tag, ".rds")))
+    if ("csv" %in% archive_formats)
+      readr::write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
+    if ("parquet" %in% archive_formats)
+      arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
     ts_txt <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
     ts_json <- paste0('{\n  "updated": "', ts_txt, '"\n}\n')
     writeLines(ts_txt, file.path(archive_dir, "timestamp.txt"))
     writeLines(ts_json, file.path(archive_dir, "timestamp.json"))
   })
+
   if (upload) {
     suppressWarnings({
-      piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".rds")), repo = repo, tag = tag)
-      piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".csv")), repo = repo, tag = tag)
-      piggyback::pb_upload(file.path(archive_dir, paste0(tag, ".parquet")), repo = repo, tag = tag)
-      piggyback::pb_upload(file.path(archive_dir, "timestamp.txt"), repo = repo, tag = tag)
-      piggyback::pb_upload(file.path(archive_dir, "timestamp.json"), repo = repo, tag = tag)
+      # Always try to upload all three types if they exist
+      pb_files <- c(
+        file.path(archive_dir, paste0(tag, ".rds")),
+        file.path(archive_dir, paste0(tag, ".csv")),
+        file.path(archive_dir, paste0(tag, ".parquet")),
+        file.path(archive_dir, "timestamp.txt"),
+        file.path(archive_dir, "timestamp.json")
+      )
+      purrr::walk(pb_files, \(f) {
+        if (file.exists(f)) piggyback::pb_upload(f, repo = repo, tag = tag)
+      })
     })
+    # Per-season files (leave as-is unless you want archive_formats control here too)
     season_files <- purrr::map(seasons, \(season) {
       season_df <- full_data |> dplyr::filter(season == !!season)
       pq_path  <- file.path(tempdir(), paste0(tag, "_", season, ".parquet"))
