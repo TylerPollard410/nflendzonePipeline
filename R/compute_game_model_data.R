@@ -1,58 +1,116 @@
-# app/data-raw/compute_game_model_data.R
+# compute_game_model_data.R
 
-#'' ----------------------------------------
-#' Convert the “long” modeling table (one row per team‐game) into a “wide” table
-#' (one row per game, with home_… and away_… prefixes on every feature).
-#' ----------------------------------------
+#' Compute Game-Level Model Data with Net Features
 #'
-#' This function expects:
-#'   • team_model_data: a data frame with one row per team‐game (the output of compute_model_data_long())
-#'                      It must include at least these columns:
-#'                        – game_id, season, week, week_seq, team, opponent
-#'                        – plus every feature column (e.g. team_elo_pre, off_total_epa_sum_cum_lag, net_off_scr_roll_lag, etc.).
-#'   • game_data      : the original game_data (one row per game_id), so that we know which team is home vs. away.
-#'                      It must include at least: game_id, home_team, away_team.
+#' Builds a modeling data frame for each game by joining in team-level features for both teams,
+#' then computing flexible "net" features via user-configurable rules. Merges additional game data,
+#' imputes missing weather, and adds a sequential week column.
 #'
-#' It returns a tibble with one row per game_id, and all features split into home_<feature> / away_<feature>.
+#' @param game_id_keys Data frame with core game columns (game_id, season, week, home_team, away_team, etc.).
+#' @param game_data Data frame. Original game-level data (for scores, lines, weather, etc).
+#' @param team_model_data Data frame. Long-format team-game-level features (one row per team per game).
+#' @param net_configs List of lists. Each sublist must specify \code{var1_prefix}, \code{var2_prefix},
+#'   \code{pattern1}, \code{pattern2}, and a binary function \code{fun}. See details.
 #'
-#' @param team_model_data A data frame (one row per team‐game) containing every “net_…_lag” feature,
-#'                        plus all other smoothed/lagged columns. Must include columns:
-#'                          game_id, season, week, week_seq, team, opponent, plus all feature columns.
-#' @param game_data       A data frame (one row per game) with columns: game_id, home_team, away_team.
-#' @return A tibble with one row per game_id, and for each original feature X, two new columns:
-#'         home_X and away_X.
-#' @importFrom dplyr left_join mutate if_else select all_of
-#' @importFrom tidyr pivot_wider
+#' @return A tibble (data.frame) with game-level modeling features, including computed net features, weather, and week sequence.
+#'
+#' @details
+#' 1. Joins in score/line columns from \code{game_data} and team features for both home/away teams from \code{team_model_data}.
+#' 2. Adds "net" features for each config using \code{\link{add_flexible_net_features}}.
+#' 3. Merges any remaining columns from \code{game_data}, imputes missing weather, removes old week_seq, and adds new week_seq.
+#'
+#' @examples
+#' \dontrun{
+#' game_model_data <- compute_game_model_data(game_id_keys, game_data, team_model_data)
+#' }
+#'
+#' @importFrom dplyr left_join select rename_with mutate filter everything
+#' @importFrom dplyr join_by
+#' @importFrom purrr reduce
 #' @export
 #' @noRd
-compute_game_model_data <- function(team_model_data, game_data) {
-  # 1) Join model_data_long to game_data to label each row as “home” or “away”
-  df <- team_model_data |>
+compute_game_model_data <- function(
+    game_data,
+    team_model_data,
+    net_configs = list(
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "elo|MOV|SOS|SRS", pattern2 = "elo|MOV|SOS|SRS",
+        fun = `-`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "pfg|OSRS", pattern2 = "pag|DSRS",
+        fun = `-`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "pag|DSRS", pattern2 = "pfg|OSRS",
+        fun = `-`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "(?=.*off)(?=.*epa).*", pattern2 = "(?=.*def)(?=.*epa).*",
+        fun = `+`,
+        order_by_team = TRUE
+      ),
+      list(
+        var1_prefix = "home_", var2_prefix = "away_",
+        pattern1 = "(?=.*off)(?=.*redzone).*", pattern2 = "(?=.*def)(?=.*redzone).*",
+        fun = `+`,
+        order_by_team = TRUE
+      )
+    )
+) {
+
+  # 1. Build base table by joining in game and team features for both teams
+  game_model_data <- game_data |>
+    dplyr::select(
+      game_id, season, game_type, season_type, week, home_team, away_team, location,
+      home_score, away_score, result, spread_line, total, total_line
+    ) |>
     dplyr::left_join(
-      dplyr::select(game_data, game_id, home_team, away_team),
-      by = "game_id"
+      team_model_data |>
+        dplyr::select(-c(opponent, location, game_type, season_type, gameday)) |>
+        dplyr::rename_with(~paste0("home_", .x),
+                           .cols = -c(game_id, season, week, team)),
+      by = dplyr::join_by(game_id, season, week, home_team == team)
     ) |>
-    dplyr::mutate(
-      side = ifelse(team == home_team, "home", "away")
-    ) |>
-    dplyr::select(-dplyr::all_of(c("home_team", "away_team")))
-
-  # 2) Identify the ID columns and the metadata columns; everything else is a “feature”
-  id_cols       <- c("game_id", "season", "week", "week_seq")
-  metadata_cols <- c("opponent", "side")
-  feature_cols  <- setdiff(names(df), c(id_cols, metadata_cols))
-
-  # 3) Pivot to wide: for each feature in 'feature_cols', create home_<feature> and away_<feature>
-  wide <- df |>
-    tidyr::pivot_wider(
-      id_cols     = id_cols,
-      names_from   = side,
-      values_from  = feature_cols,
-      names_glue = "{side}_{.value}"
+    dplyr::left_join(
+      team_model_data |>
+        dplyr::select(-c(opponent, location, game_type, season_type, gameday)) |>
+        dplyr::rename_with(~paste0("away_", .x),
+                           .cols = -c(game_id, season, week, team)),
+      by = dplyr::join_by(game_id, season, week, away_team == team)
     )
 
-  # 4) Return the wide table (one row per game_id, with home_/away_ prefixes)
-  out_df <- game_data |>
-    left_join(wide, by = c("game_id", "season", "week", "week_seq", "home_team", "away_team"))
-  return(out_df)
+  # 2. Compute all net features
+  game_model_data <- purrr::reduce(
+    net_configs,
+    \(df, cfg) add_flexible_net_features(
+      df,
+      var1_prefix = cfg$var1_prefix,
+      var2_prefix = cfg$var2_prefix,
+      pattern1    = cfg$pattern1,
+      pattern2    = cfg$pattern2,
+      fun         = cfg$fun
+    ),
+    .init = game_model_data
+  )
+
+  # 3. Merge remaining game data (weather, metadata), impute weather, filter, add week_seq
+  game_model_data <- game_model_data |>
+    dplyr::left_join(game_data) |>
+    dplyr::mutate(
+      temp = ifelse(is.na(temp), 68, temp),
+      wind = ifelse(is.na(wind), 0, wind)
+    ) |>
+    dplyr::filter(season > 2006) |>
+    dplyr::select(-week_seq) |>
+    add_week_seq()
+
+  game_model_data
 }

@@ -1,102 +1,97 @@
-# app/data-raw/compute_team_model_data.R
+# compute_team_model_data.R
 
-# ----------------------------------------
-# Assemble final modeling dataset (“team_model_data”)
-# ----------------------------------------
-#
-#' This function expects:
-#'   • team_features_data   : a data frame (one row per team‐game)
-#'   • elo_data         : Elo feature table
-#'   • srs_data         : SRS feature table
-#'   • epa_data         : EPA feature table
-#'   • scores_data      : Scoring feature table
-#'   • series_data      : Series conversion feature table
-#'   • turnover_data    : Turnover feature table
-#'   • redzone_data     : Redzone feature table
-#'   • window, span     : numeric parameters for rolling/EWMA
+#' Compute Team-Level Modeling Data (Long Format)
 #'
-#' It returns a single data frame, with all engineered features joined
-#' onto `game_data_long` in the specified order. Nothing is sourced or loaded
-#' inside this function—the caller must ensure all inputs and helper functions
-#' are already in the environment.
+#' This function computes engineered features for team-level model data in long format,
+#' including ELO smoothing, rolling means, cumulative averages, and lagged features for each team.
 #'
-#' @param game_data_long  Data frame: one row per team‐game (base for features)
-#' @param elo_data        Data frame: Elo ratings (wide form)
-#' @param srs_data        Data frame: SRS ratings (season, week, team, metrics)
-#' @param epa_data        Data frame: raw EPA metrics (must include `off_` & `def_` prefixes)
-#' @param scores_data     Data frame: scoring metrics (team‐level)
-#' @param series_data     Data frame: series conversion rates (team‐level)
-#' @param turnover_data   Data frame: turnover counts (team‐level)
-#' @param redzone_data    Data frame: red zone stats (team‐level)
-#' @param window          Integer: window size for rolling averages (default = 5)
-#' @param span            Numeric: span parameter for EWMA (default = 5)
-#' @return A tibble with one row per team‐game and all engineered features.
-#' @importFrom dplyr left_join
+#' @param game_data_long Data frame (long format) of team-game rows. Must include columns:
+#'   game_id, season, game_type, season_type, week, team, opponent, location.
+#' @param team_features_data Data frame of team-level features to join, including ELO and performance metrics.
+#' @param elo_update_roll_window Integer. Window for rolling mean of `elo_update` (default: 5).
+#' @param feats_roll_window Integer. Window for rolling/cumulative means of stat features (default: 5).
+#'
+#' @return A tibble (data.frame) with one row per team-game, including all engineered features.
+#'
+#' @details
+#' The returned data frame contains team-game-level features with various engineered columns,
+#' such as lagged ELO, rolling updates, per-game rates, and cumulative means. Columns that match
+#' scoring and performance stats (pf, pfg, pa, pag, win_pct, MOV, SOS, SRS, OSRS, DSRS) are lagged
+#' and have rolling/cumulative features computed. ELO initialization is handled with weighted averages
+#' for first games in a season.
+#'
+#' @examples
+#' \dontrun{
+#' model_data <- compute_team_model_data(game_data_long, team_features_data, 3, 7)
+#' }
+#'
+#' @importFrom dplyr select filter left_join mutate across case_when lag cummean all_of
+#' @importFrom slider slide_dbl
+#' @importFrom purrr reduce
+#' @importFrom glue glue
 #' @export
 #' @noRd
-compute_model_data_long <- function(archive_loc = "artifacts/data-archive/",
-                                    window = 5,
-                                    span   = 5) {
-  #game_long_df,
-  # elo_df,
-  # srs_df,
-  # epa_df,
-  # scores_df,
-  # series_df,
-  # turnover_df,
-  # redzone_df,) {
+compute_team_model_data <- function(game_data_long,
+                                    team_features_data,
+                                    elo_update_roll_window = 5,
+                                    feats_roll_window = 5) {
 
-  game_data <- compute_game_data(seasons = all_seasons)
-  game_data_long <- compute_game_data_long(game_df = game_data)
-  load(paste0(archive_loc, "elo_data.rda"))      # loads object `elo_data`
-  load(paste0(archive_loc, "srs_data.rda"))      # loads object `srs_data`
-  load(paste0(archive_loc, "epa_data.rda"))      # loads object `epa_data`
-  load(paste0(archive_loc, "scores_data.rda"))   # loads object `scores_data`
-  load(paste0(archive_loc, "series_data.rda"))   # loads object `series_data`
-  load(paste0(archive_loc, "turnover_data.rda")) # loads object `turnover_data`
-  load(paste0(archive_loc, "redzone_data.rda"))  # loads object `redzone_data`
+  game_long_id_keys <- game_data_long |>
+    dplyr::select(
+      game_id, season, game_type, season_type, week, team, opponent, location
+    )
 
-  id_cols <- c("game_id", "season", "week", "week_seq", "team", "opponent")
-
-  # (A) Join Elo features
-  df1 <- process_elo_data(base_df = game_data_long,
-                          elo_raw = elo_data)
-
-  # (B) Join SRS features
-  df2 <- process_srs_data(base_df = df1,
-                          srs_raw = srs_data)
-
-  # (C) Join EPA features (cumulative, rolling, EWMA, net)
-  df3 <- process_epa_data(base_df = df2,
-                          epa_raw = epa_data,
-                          window  = window,
-                          span    = span)
-
-  # (D) Join Scoring features
-  df4 <- process_scores_data(base_df   = df3,
-                             scores_raw = scores_data,
-                             window     = window,
-                             span       = span)
-
-  # (E) Join Series conversion rates
-  df5 <- process_series_data(base_df    = df4,
-                             series_raw = series_data,
-                             window     = window,
-                             span       = span)
-
-  # (F) Join Turnover features
-  df6 <- process_turnover_data(base_df     = df5,
-                               turnover_raw = turnover_data,
-                               window       = window,
-                               span         = span)
-
-  # (G) Join Redzone features and return
-  model_data_long <- process_redzone_data(base_df     = df6,
-                                          redzone_raw = redzone_data,
-                                          window      = window,
-                                          span        = span)
-
-  model_data_long <- model_data_long |>
-    filter(!is.na(team_elo_pre))
-  return(model_data_long)
+  team_model_data <- game_long_id_keys |>
+    dplyr::left_join(team_features_data) |>
+    dplyr::mutate(
+      elo_pre = dplyr::case_when(
+        week == 1 ~ dplyr::lag(elo_post, n = 1)*0.6 + 1500*0.4,
+        week != 1 ~ elo_pre,
+        TRUE ~ NA_real_
+      ),
+      .by = team
+    ) |>
+    dplyr::mutate(
+      "{glue::glue('elo_update_roll_{elo_update_roll_window}')}" :=
+        slider::slide_dbl(elo_update, mean, .before = elo_update_roll_window - 1, .complete = FALSE),
+      .after = elo_update,
+      .by = team
+    ) |>
+    dplyr::mutate(
+      "{glue::glue('elo_update_roll_{elo_update_roll_window}')}" :=
+        dplyr::lag(.data[[glue::glue('elo_update_roll_{elo_update_roll_window}')]], n = 1),
+      .by = team
+    ) |>
+    dplyr::mutate(
+      pfg = pf/games,
+      pag = pa/games,
+      .after = pa
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(matches("^(pf|pfg|pa|pag|win_pct|MOV|SOS|SRS|OSRS|DSRS)($|_|[0-9])")),
+        ~dplyr::lag(.x, n = 1, default = NA)),
+      .by = team
+    ) |>
+    (\(.) {
+      after_cols <- names(.)[(which(names(.) == "DSRS_20") + 1):ncol(.)]
+      purrr::reduce(
+        after_cols,
+        \(df, col) {
+          roll_name <- glue::glue("{col}_roll_{feats_roll_window}")
+          cummean_name <- glue::glue("{col}_cummean")
+          df |>
+            dplyr::mutate(
+              "{cummean_name}" := cummean(.data[[col]]),
+              "{roll_name}"    := slider::slide_dbl(.data[[col]], mean, .before = feats_roll_window - 1, .complete = FALSE),
+              "{cummean_name}" := dplyr::lag(.data[[cummean_name]], n = 1),
+              "{roll_name}"    := dplyr::lag(.data[[roll_name]], n = 1),
+              .after = col,
+              .by = team
+            ) |>
+            dplyr::select(-dplyr::all_of(col))
+        },
+        .init = .
+      )
+    })()
 }

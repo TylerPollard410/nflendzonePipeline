@@ -1,3 +1,4 @@
+golem::detach_all_attached()
 
 packrat::clean()
 

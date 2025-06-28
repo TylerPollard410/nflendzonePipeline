@@ -1,4 +1,4 @@
-game_id,season,week,team,opponent,location,off_red_zone_app_perc,off_red_zone_eff,def_red_zone_app_perc,def_red_zone_eff
+game_id,season,week,team,opponent,location,off_redzone_app_perc,off_redzone_eff,def_redzone_app_perc,def_redzone_eff
 2006_01_MIA_PIT,2006,1,PIT,MIA,home,0.15384615384615385,0.5,0.25,0.6666666666666666
 2006_01_MIA_PIT,2006,1,MIA,PIT,away,0.25,0.6666666666666666,0.15384615384615385,0.5
 2006_01_ATL_CAR,2006,1,CAR,ATL,home,0,0,0.25,0.3333333333333333

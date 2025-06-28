@@ -15,18 +15,32 @@ compute_scores_data <- function(
     season_proc,
     sum_level,
     stat_level,
-    season_level
+    season_level,
+    prev_stats
 ) {
   id_cols <- c("game_id", "season", "week", "team")
 
+  season_type <- season_type_for_nflfastR(season_level)
+
+  if (is.null(prev_stats)){
+    nflverse_stats_week_team_all <- nflfastR::calculate_stats(
+      seasons = all_seasons,
+      summary_level = sum_level,
+      stat_type = stat_level,
+      season_type = season_type
+    )
+  } else {
+    nflverse_stats_week_team_all <- prev_stats
+  }
+
   # Pull precomputed stats (uses all cache/checking logic internally!)
-  nflverse_stats_week_team_all <- calc_nflverse_stats(
-    game_long_df       = game_long_df,
-    sum_level          = sum_level,
-    stat_level         = stat_level,
-    season_level       = season_level,
-    season_proc        = season_proc
-  )
+  # nflverse_stats_week_team_all <- calc_nflverse_stats(
+  #   game_long_df       = game_long_df,
+  #   sum_level          = sum_level,
+  #   stat_level         = stat_level,
+  #   season_level       = season_level,
+  #   season_proc        = season_proc
+  # )
 
   # STEP 1: Select raw scoring stats
   scoresData <- nflverse_stats_week_team_all |>
