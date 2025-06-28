@@ -1,11 +1,11 @@
-# app/data-raw/compute_model_data_long.R
+# app/data-raw/compute_team_model_data.R
 
 # ----------------------------------------
-# Assemble final modeling dataset (“model_data_long”)
+# Assemble final modeling dataset (“team_model_data”)
 # ----------------------------------------
 #
 #' This function expects:
-#'   • game_data_long   : a data frame (one row per team‐game)
+#'   • team_features_data   : a data frame (one row per team‐game)
 #'   • elo_data         : Elo feature table
 #'   • srs_data         : SRS feature table
 #'   • epa_data         : EPA feature table

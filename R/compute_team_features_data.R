@@ -1,4 +1,4 @@
-#' Aggregate Feature Data Frames into a Long Format
+#' Aggregate Feature Data Frames into a Long Formated Team Features Data Frame
 #'
 #' This function binds together multiple feature-level data frames into a single wide-format table
 #' based on a character vector of feature names. Each name corresponds to a saved file (e.g., `.rds`)
@@ -10,7 +10,7 @@
 #' @return A single data frame with all features bound together.
 #' @export
 #' @noRd
-compute_feature_long <- function(
+compute_team_features_data <- function(
     features,
     archive_loc = "archive/data-archive",
     file_type = "rds"
