@@ -259,6 +259,7 @@ tag <- "nfl_stats_season_team_regpost"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+prior_week_team <- readRDS("artifacts/data-archive/nfl_stats_week_team_regpost/nfl_stats_week_team_regpost.rds")
 
 if (full_build || is.null(prior_data)) {
   # FULL REBUILD
@@ -270,8 +271,8 @@ if (full_build || is.null(prior_data)) {
     season_type = "REG+POST"
   )
 } else if (should_rebuild(game_data |> filter(!is.na(result)),
-                          prior_data,
-                          id_cols = c("season", "week"))) {
+                          prior_week_team,
+                          id_cols = c("game_id"))) {
   # INCREMENTAL: Only update current season
   cat("[nfl_stats_season_team_regpost] Incrementally updating current season...\n")
   # All previous seasons from archive
@@ -296,6 +297,22 @@ if (full_build || is.null(prior_data)) {
   cat("[nfl_stats_season_team_regpost] No new data. Using prior archive.\n")
   full_data <- prior_data
 }
+
+
+# current_season_games <- game_data_long |>
+#   filter(season %in% seasons_to_process & !is.na(result)) |>
+#   nrow()
+# prior_data_season_games <- prior_data |>
+#   filter(season %in% seasons_to_process) |>
+#   pull(games) |>
+#   sum()
+#
+# rebuild_cond1 <- should_rebuild(game_data |> filter(!is.na(result)),
+#                                 prior_week_team,
+#                                 id_cols = c("game_id"))
+# rebuild_cond2 <- current_season_games != prior_data_season_games
+#
+# if (rebuild_cond1 || rebuild_cond2) {
 
 save_and_upload(
   tag         = tag,
@@ -806,6 +823,7 @@ save_and_upload(
 
 # ---------------------------------------------------------------------------- #
 ### team_features ----
+cat("%%%% Generating team_features %%%%\n")
 tag <- "team_features"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
@@ -828,6 +846,7 @@ save_and_upload(
 
 # ---------------------------------------------------------------------------- #
 ### game_features ----
+cat("%%%% Generating game_features %%%%\n")
 tag <- "game_features"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
@@ -853,6 +872,7 @@ save_and_upload(
 
 # ---------------------------------------------------------------------------- #
 ### team_model ----
+cat("%%%% Generating team_model %%%%\n")
 tag <- "team_model"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
@@ -878,6 +898,7 @@ save_and_upload(
 
 # ---------------------------------------------------------------------------- #
 ### game_model ----
+cat("%%%% Generating game_model %%%%\n")
 tag <- "game_model"
 archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
@@ -886,47 +907,47 @@ prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 team_model_df <- readRDS("artifacts/data-archive/team_model/team_model.rds")
 
 full_data <- compute_game_model_data(
-    game_data = game_data,
-    team_model_data = team_model_df,
-    net_configs = list(
-      list(
-        var1_prefix = "home_", var2_prefix = "away_",
-        pattern1 = "elo|MOV|SOS|SRS", pattern2 = "elo|MOV|SOS|SRS",
-        fun = `-`,
-        order_by_team = TRUE
-      ),
-      list(
-        var1_prefix = "home_", var2_prefix = "away_",
-        pattern1 = "pfg|OSRS", pattern2 = "pag|DSRS",
-        fun = `-`,
-        order_by_team = TRUE
-      ),
-      list(
-        var1_prefix = "home_", var2_prefix = "away_",
-        pattern1 = "pag|DSRS", pattern2 = "pfg|OSRS",
-        fun = `-`,
-        order_by_team = TRUE
-      ),
-      list(
-        var1_prefix = "home_", var2_prefix = "away_",
-        pattern1 = "(?=.*off)(?=.*epa).*", pattern2 = "(?=.*def)(?=.*epa).*",
-        fun = `+`,
-        order_by_team = TRUE
-      ),
-      list(
-        var1_prefix = "home_", var2_prefix = "away_",
-        pattern1 = "(?=.*off)(?=.*red_zone).*", pattern2 = "(?=.*def)(?=.*red_zone).*",
-        fun = `+`,
-        order_by_team = TRUE
-      )
+  game_data = game_data,
+  team_model_data = team_model_df,
+  net_configs = list(
+    list(
+      var1_prefix = "home_", var2_prefix = "away_",
+      pattern1 = "elo|MOV|SOS|SRS", pattern2 = "elo|MOV|SOS|SRS",
+      fun = `-`,
+      order_by_team = TRUE
+    ),
+    list(
+      var1_prefix = "home_", var2_prefix = "away_",
+      pattern1 = "pfg|OSRS", pattern2 = "pag|DSRS",
+      fun = `-`,
+      order_by_team = TRUE
+    ),
+    list(
+      var1_prefix = "home_", var2_prefix = "away_",
+      pattern1 = "pag|DSRS", pattern2 = "pfg|OSRS",
+      fun = `-`,
+      order_by_team = TRUE
+    ),
+    list(
+      var1_prefix = "home_", var2_prefix = "away_",
+      pattern1 = "(?=.*off)(?=.*epa).*", pattern2 = "(?=.*def)(?=.*epa).*",
+      fun = `+`,
+      order_by_team = TRUE
+    ),
+    list(
+      var1_prefix = "home_", var2_prefix = "away_",
+      pattern1 = "(?=.*off)(?=.*red_zone).*", pattern2 = "(?=.*def)(?=.*red_zone).*",
+      fun = `+`,
+      order_by_team = TRUE
     )
+  )
 )
 
 save_and_upload(
   tag         = tag,
   full_data   = full_data,
-  seasons     = all_seasons,
-  #seasons     = seasons_to_process,
+  #seasons     = all_seasons,
+  seasons     = seasons_to_process,
   repo        = github_data_repo,
   archive_dir = archive_dir,
   upload = TRUE,
