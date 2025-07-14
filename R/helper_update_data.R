@@ -49,7 +49,15 @@ save_and_upload <- function(
       readr::write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
     if ("parquet" %in% archive_formats)
       arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
-    ts_txt <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
+    ts_nflverse <- attr(full_data, "nflverse_timestamp")
+    ts_txt <- if (is.null(ts_nflverse)) {
+      # Assign the current time in New York time zone with label
+      format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z", tz = "America/New_York")
+    } else if (inherits(ts_nflverse, "POSIXt")) {
+      format(ts_nflverse, "%Y-%m-%d %H:%M:%S %Z", tz = "America/New_York")
+    } else {
+      as.character(ts_nflverse)
+    }
     ts_json <- paste0('{\n  "updated": "', ts_txt, '"\n}\n')
     writeLines(ts_txt, file.path(archive_dir, "timestamp.txt"))
     writeLines(ts_json, file.path(archive_dir, "timestamp.json"))
