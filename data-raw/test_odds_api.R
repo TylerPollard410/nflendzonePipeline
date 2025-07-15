@@ -1,9 +1,19 @@
+# ============================================================================ #
+# SPORTS ----
+# ============================================================================ #
+
 # Use environment variable (recommended)
 sports <- get_odds_api_sports(all = TRUE)
 
 # Check usage after test
 get_odds_api_usage()
 
+# ============================================================================ #
+# CURRENT EVENTS ----
+# ============================================================================ #
+
+# ---------------------------------------------------------------------------- #
+## Odds ----
 # Test getting NFL odds (adjust the sport key if needed)
 nfl_odds <- get_odds_api_odds(
   sport = "americanfootball_nfl",
@@ -30,11 +40,10 @@ print(nfl_odds)
 # print(nfl_odds_time)
 
 # Check your API usage after tests
-usage <- get_odds_api_usage()
-print("API usage:")
-print(usage)
+get_odds_api_usage()
 
-
+# ---------------------------------------------------------------------------- #
+## Scores ----
 nfl_scores <- get_odds_api_scores(
   sport = "americanfootball_nfl",
   api_key = NULL,
@@ -67,6 +76,8 @@ nfl_scores3 <- get_odds_api_scores(
 get_odds_api_usage()
 
 
+# ---------------------------------------------------------------------------- #
+## Events ----
 nfl_events <- get_odds_api_events(
   sport = "americanfootball_nfl",
   api_key = NULL,
@@ -79,7 +90,20 @@ nfl_events <- get_odds_api_events(
 # Check your API usage after tests
 get_odds_api_usage()
 
+nfl_events_old <- get_odds_api_events(
+  sport = "americanfootball_nfl",
+  api_key = NULL,
+  dateFormat = "iso",
+  eventIds = NULL,
+  commenceTimeFrom = "2024-09-06T00:20:00Z",
+  commenceTimeTo = "2024-09-10T00:15:00Z"
+)
 
+# Check your API usage after tests
+get_odds_api_usage()
+
+# ---------------------------------------------------------------------------- #
+## Event Odds ----
 nfl_event_odds <- get_odds_api_event_odds(
   sport = "americanfootball_nfl",
   eventId = "dee0a41ed5e8201a96d457899adbe918",
@@ -97,7 +121,12 @@ nfl_event_odds <- get_odds_api_event_odds(
 # Check your API usage after tests
 get_odds_api_usage()
 
+# ============================================================================ #
+# DEFAULT ----
+# ============================================================================ #
 
+# ---------------------------------------------------------------------------- #
+## Participants ----
 nfl_participants <- get_odds_api_participants(
   sport = "americanfootball_nfl",
   api_key = NULL
@@ -107,6 +136,12 @@ nfl_participants <- get_odds_api_participants(
 get_odds_api_usage()
 
 
+# ============================================================================ #
+# HISTORICAL EVENTS ----
+# ============================================================================ #
+
+# ---------------------------------------------------------------------------- #
+## Odds ----
 # NFL historical odds: snapshot at season start 2024
 nfl_hist_odds_start <- get_odds_api_historical_odds(
   sport = "americanfootball_nfl",
@@ -126,6 +161,20 @@ print(nfl_hist_odds_start)
 
 # Check your API usage after tests
 get_odds_api_usage()
+
+nfl_hist_odds_start3 <- get_odds_api_historical_odds(
+  sport = "americanfootball_nfl",
+  date = "2020-09-11T00:20:00Z",  # NFL season kickoff night
+  regions = "us2",
+  markets = "spreads",
+  dateFormat = "iso",
+  oddsFormat = "decimal",
+  eventIds = NULL,
+  #bookmakers = "hardrockbet",
+  includeLinks = NULL,
+  includeSids = NULL,
+  includeBetLimits = NULL
+)
 
 library(dplyr)
 library(purrr)
@@ -188,8 +237,10 @@ schedules_2024 <- schedules_2024 |>
 # Check your API usage after tests
 get_odds_api_usage()
 
+# ---------------------------------------------------------------------------- #
+## Events ----
 
-# ---- Batch get NFL historical events for every regular season week in 2024 ----
+# Batch get NFL historical events for every regular season week in 2024 ---- #
 # NFL historical odds: snapshot at season start 2024
 nfl_hist_events_start <- get_odds_api_historical_events(
   sport = "americanfootball_nfl",
@@ -204,6 +255,15 @@ print(nfl_hist_odds_start)
 
 # Check your API usage after tests
 get_odds_api_usage()
+
+nfl_hist_events_start2 <- get_odds_api_historical_events(
+  sport = "americanfootball_nfl",
+  date = "2020-09-11T00:20:00Z",  # NFL season kickoff night
+  dateFormat = "iso",
+  eventIds = NULL,
+  commenceTimeFrom = NULL,
+  commenceTimeTo = NULL
+)
 
 library(dplyr)
 library(purrr)
@@ -248,6 +308,9 @@ print(nfl_hist_events_2024)
 get_odds_api_usage()
 
 
+# ---------------------------------------------------------------------------- #
+## Event Odds ----
+
 # Example: Get historical odds for a single event at a snapshot
 
 # 1. Find an event ID from the Week 1 snapshot
@@ -280,7 +343,7 @@ print(nfl_hist_event_odds_1)
 # Check your API usage after tests
 get_odds_api_usage()
 
-# ---- BATCH EXAMPLE: Get historical event odds for ALL events in Week 1 ----
+# BATCH EXAMPLE: Get historical event odds for ALL events in Week 1 ---- #
 library(dplyr)
 library(purrr)
 library(glue)
