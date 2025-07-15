@@ -70,53 +70,95 @@ get_odds_api_historical_odds <- function(
     query = query
   )
 
-  # Defensive: If no data, return default-structure empty tibble
+  # Helper for default-structure empty tibble (with snapshot columns)
+  empty_odds_snapshot_tibble <- function() tibble::tibble(
+    timestamp = character(),
+    previous_timestamp = character(),
+    next_timestamp = character(),
+    id = character(),
+    sport_key = character(),
+    sport_title = character(),
+    commence_time = character(),
+    home_team = character(),
+    away_team = character(),
+    bookmaker_key = character(),
+    bookmaker = character(),
+    bookmaker_last_update = character(),
+    market_key = character(),
+    market_last_update = character(),
+    outcomes_name = character(),
+    outcomes_price = numeric(),
+    outcomes_point = numeric()
+  )
+
+  # Defensive: No data in snapshot
   if (!is.list(snapshot) || !"data" %in% names(snapshot) || length(snapshot$data) == 0) {
-    message("No historical odds found for this sport/date/market combination.")
-    return(tibble::tibble(
-      timestamp = character(),
-      previous_timestamp = character(),
-      next_timestamp = character(),
-      id = character(),
-      sport_key = character(),
-      sport_title = character(),
-      commence_time = character(),
-      home_team = character(),
-      away_team = character(),
-      bookmaker_key = character(),
-      bookmaker = character(),
-      bookmaker_last_update = character(),
-      market_key = character(),
-      market_last_update = character(),
-      outcomes_name = character(),
-      outcomes_price = numeric(),
-      outcomes_point = numeric()
-    ))
+    message("No historical odds found for this sport/date/market combination (empty data).")
+    return(empty_odds_snapshot_tibble())
   }
 
-  # Add snapshot metadata columns to each event row, then flatten as in odds function
-  out <- tibble::as_tibble(snapshot$data)
-  out$timestamp <- snapshot$timestamp
-  out$previous_timestamp <- snapshot$previous_timestamp
-  out$next_timestamp <- snapshot$next_timestamp
+  result <- tibble::as_tibble(snapshot$data)
+  # Add snapshot-level columns
+  result$timestamp <- snapshot$timestamp
+  result$previous_timestamp <- snapshot$previous_timestamp
+  result$next_timestamp <- snapshot$next_timestamp
 
-  out |>
-    tidyr::unnest(bookmakers) |>
-    dplyr::rename(
-      bookmaker_key = key,
-      bookmaker = title,
-      bookmaker_last_update = last_update
-    ) |>
-    tidyr::unnest(markets) |>
-    dplyr::rename(
-      market_key = key,
-      market_last_update = last_update
-    ) |>
-    tidyr::unnest(outcomes) |>
-    dplyr::rename(
-      outcomes_name = name,
-      outcomes_price = price,
-      outcomes_point = point
-    ) |>
+  # If ALL bookmaker lists are empty for every event:
+  if (all(purrr::map_lgl(result$bookmakers, \(x) length(x) == 0))) {
+    message("No bookmakers/odds available for this snapshot, but returning event metadata.")
+    return(
+      result |>
+        dplyr::transmute(
+          timestamp, previous_timestamp, next_timestamp,
+          id, sport_key, sport_title, commence_time, home_team, away_team,
+          bookmaker_key = NA_character_,
+          bookmaker = NA_character_,
+          bookmaker_last_update = NA_character_,
+          market_key = NA_character_,
+          market_last_update = NA_character_,
+          outcomes_name = NA_character_,
+          outcomes_price = NA_real_,
+          outcomes_point = NA_real_
+        )
+    )
+  }
+
+  # Otherwise, proceed to unnest as usual
+  result <- tidyr::unnest(result, bookmakers)
+  if (nrow(result) == 0 || !"key" %in% names(result)) {
+    message("No bookmakers found after unnest (likely all empty) -- this should not happen due to previous check.")
+    return(empty_odds_snapshot_tibble())
+  }
+  result <- dplyr::rename(
+    result,
+    bookmaker_key = key,
+    bookmaker = title,
+    bookmaker_last_update = last_update
+  )
+
+  result <- tidyr::unnest(result, markets)
+  if (nrow(result) == 0 || !"key" %in% names(result)) {
+    message("No markets found after bookmaker filter (empty markets).")
+    return(empty_odds_snapshot_tibble())
+  }
+  result <- dplyr::rename(
+    result,
+    market_key = key,
+    market_last_update = last_update
+  )
+
+  result <- tidyr::unnest(result, outcomes)
+  if (nrow(result) == 0 || !"name" %in% names(result)) {
+    message("No outcomes found after market filter (empty outcomes).")
+    return(empty_odds_snapshot_tibble())
+  }
+  result <- dplyr::rename(
+    result,
+    outcomes_name = name,
+    outcomes_price = price,
+    outcomes_point = point
+  )
+
+  result |>
     dplyr::relocate(timestamp, previous_timestamp, next_timestamp)
 }
