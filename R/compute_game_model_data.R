@@ -108,7 +108,7 @@ compute_game_model_data <- function(
       temp = ifelse(is.na(temp), 68, temp),
       wind = ifelse(is.na(wind), 0, wind)
     ) |>
-    dplyr::filter(season > 2006) |>
+    dplyr::filter(season >= 2006) |>
     dplyr::select(-week_seq) |>
     add_week_seq()
 

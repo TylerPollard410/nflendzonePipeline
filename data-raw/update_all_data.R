@@ -496,12 +496,12 @@ if (full_build || is.null(prior_data)) {
   cat("[elo] Full rebuild of ELO data...\n")
   full_data <- compute_elo_data(
     game_df = game_data |> dplyr::filter(!is.na(result)),
-    initial_elo = 1500,
+    initial_elo = 1505,
     K = 20,
     home_advantage = 65,
     d = 400,
     apply_margin_multiplier = TRUE,
-    season_factor = 0.6,
+    season_factor = 0.65,
     prior_data = NULL,
     verbose = TRUE
   )
@@ -511,12 +511,12 @@ if (full_build || is.null(prior_data)) {
   cat("[elo] Incrementally updating ELO data...\n")
   full_data <- compute_elo_data(
     game_df = game_data |> dplyr::filter(!is.na(result)),
-    initial_elo = 1500,
+    initial_elo = 1505,
     K = 20,
-    home_advantage = 0,
+    home_advantage = 65,
     d = 400,
     apply_margin_multiplier = TRUE,
-    season_factor = 0.6,
+    season_factor = 0.65,
     prior_data = prior_data,
     verbose = TRUE
   )
