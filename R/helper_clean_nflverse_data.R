@@ -137,6 +137,117 @@ clean_teamopponent <- function(df,
 }
 
 
+#' Clean NFL team abbreviations in a vector or data frame (exact matches only)
+#'
+#' A thin wrapper around [nflreadr::clean_team_abbrs()] that:
+#' - If given a **vector** (character or factor), returns `clean_team_abbrs(x)`,
+#'   preserving factor class.
+#' - If given a **data frame** (or a plain named list of equal-length vectors),
+#'   identifies columns that contain **exact team abbreviations** (any value
+#'   equals a known team code, i.e., `%in%`), applies `clean_team_abbrs()` to
+#'   those columns, and returns the same object type. Free-text columns where a
+#'   team code appears only as a **substring** are **ignored**.
+#'
+#' An attribute `"cleaned_cols"` (character vector) is attached for data-frame
+#' or list inputs, listing which columns were cleaned.
+#'
+#' @param x A character/factor vector, a data frame/tibble, or a named list of
+#'   equal-length vectors.
+#' @param verbose Logical; if `TRUE`, message which columns were cleaned for
+#'   data-frame/list inputs. Default `FALSE`.
+#'
+#' @return
+#' - Vector input: a cleaned vector (character or factor, matching input).
+#' - Data frame/list input: the same class of object with cleaned columns; has
+#'   attribute `"cleaned_cols"`.
+#'
+#' @examples
+#' \dontrun{
+#'   # Vector
+#'   clean_team_abbrs_auto(c("STL", "OAK", "BAL"))
+#'
+#'   # Data frame
+#'   pbp2 <- clean_team_abbrs_auto(pbp, verbose = TRUE)
+#'   attr(pbp2, "cleaned_cols")
+#' }
+#' @importFrom nflreadr clean_team_abbrs team_abbr_mapping
+#' @export
+#' @noRd
+clean_team_abbrs_auto <- function(x, verbose = FALSE) {
+  if (!requireNamespace("nflreadr", quietly = TRUE)) {
+    stop("Package 'nflreadr' is required.")
+  }
+
+  #--- helper: clean a single vector; preserve factor class -------------------
+  clean_vec <- function(v) {
+    was_factor <- is.factor(v)
+    v_chr <- as.character(v)
+    v_out <- suppressWarnings(nflreadr::clean_team_abbrs(v_chr))
+    if (was_factor) factor(v_out) else v_out
+  }
+
+  #--- build allowed set of raw team codes for `%in%` detection ---------------
+  allowed <- try({
+    teams_df <- nflreadr::load_teams(current = TRUE)
+    # primary: nflreadr mapping column (simple & robust)
+    if (!"team_abbr" %in% names(teams_df)) stop("no_col")
+    unique(stats::na.omit(as.character(teams_df$team_abbr)))
+  }, silent = TRUE)
+
+  #--- vector path ------------------------------------------------------------
+  if (is.character(x) || is.factor(x)) {
+    return(clean_vec(x))
+  }
+
+  #--- data frame / list path -------------------------------------------------
+  is_df <- is.data.frame(x)
+  if (!(is_df || is.list(x))) {
+    stop("`x` must be a character/factor vector, a data.frame/tibble, or a named list.")
+  }
+
+  df <- if (is_df) x else as.data.frame(x, stringsAsFactors = FALSE, optional = TRUE)
+
+  # exact-match detector: does the column contain ANY known team code?
+  is_team_col <- vapply(
+    df,
+    function(col) {
+      if (!(is.character(col) || is.factor(col))) return(FALSE)
+      any(as.character(col) %in% allowed, na.rm = TRUE)
+    },
+    logical(1)
+  )
+
+  to_clean <- names(df)[is_team_col]
+
+  if (length(to_clean)) {
+    df[to_clean] <- lapply(df[to_clean], clean_vec)
+    if (verbose) {
+      message(
+        "Cleaned team abbreviations in ",
+        length(to_clean),
+        " column(s): ",
+        paste(to_clean, collapse = ", ")
+      )
+    }
+  } else if (verbose) {
+    message("No columns detected for cleaning.")
+  }
+
+  attr(df, "cleaned_cols") <- to_clean
+
+  # return in original container type
+  if (is_df) {
+    df
+  } else {
+    # convert back to a named list with original names/order
+    out <- as.list(df)
+    names(out) <- names(df)
+    out
+  }
+}
+
+
+
 #' Add a Consecutive Week Sequence Across Seasons
 #'
 #' Given a data frame that contains `season` and `week` columns (e.g., `game_data` or

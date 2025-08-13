@@ -9,7 +9,7 @@
 #' @return A tibble of play-by-play data, with the usual nflverse timestamp attribute
 #' @export
 #' @noRd
-compute_pbp_data <- function(seasons = 2006:most_recent_season()) {
+compute_pbp_data <- function(seasons = 1999:most_recent_season()) {
   # ensure parallel backend is set
   future::plan("multisession")
 
