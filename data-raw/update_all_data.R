@@ -38,7 +38,7 @@ library(nflendzonePipeline)
 # ============================================================================ #
 # 3. GLOBAL VARIABLES ----
 # ============================================================================ #
-start_season <- 1999
+start_season <- 2002
 current_season <- get_current_season()
 all_seasons <- start_season:current_season
 github_data_repo <- "TylerPollard410/nflendzoneData"
