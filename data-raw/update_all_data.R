@@ -110,6 +110,10 @@ suppressWarnings({
 cat("%%%% Generating game_data %%%%\n")
 game_data <- compute_game_data(seasons = all_seasons)
 
+all_seasons <- game_data |>
+  filter(!is.na(result)) |>
+  pull(season) |> unique() |> sort()
+
 # ---------------------------------------------------------------------------- #
 #### game_data_long ----
 cat("%%%% Generating game_data_long %%%%\n")
@@ -278,7 +282,7 @@ if (full_build || is.null(prior_data)) {
   # All previous seasons from archive
   prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season %in% seasons_to_process)
+  curr_season_data <- game_data |> filter(!is.na(result), season %in% seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[nfl_stats_season_team_regpost] No current season games. Using prior archive.\n")
@@ -352,7 +356,7 @@ if (full_build || is.null(prior_data)) {
   # All previous seasons from archive
   prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season %in% seasons_to_process)
+  curr_season_data <- game_data |> filter(!is.na(result), season %in% seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[nfl_stats_season_player_regpost] No current season games. Using prior archive.\n")
@@ -451,7 +455,7 @@ if (full_build || is.null(prior_data)) {
   # All previous seasons from archive
   prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
-  curr_season_data <- game_data |> filter(season == seasons_to_process)
+  curr_season_data <- game_data |> filter(!is.na(result), season == seasons_to_process)
   # Optionally: skip if no new weeks/games
   if (nrow(curr_season_data) == 0) {
     cat("[weekly_standings] No current season games. Using prior archive.\n")
