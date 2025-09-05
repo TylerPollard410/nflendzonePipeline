@@ -49,7 +49,7 @@ github_releases_base_url <- paste0("https://github.com/",
 # Get full_build flag from command line argument or default to FALSE
 args <- commandArgs(trailingOnly = TRUE)
 full_build <- if (length(args) > 0) as.logical(args[1]) else FALSE # Set FALSE for incremental update
-full_build <- TRUE
+#full_build <- TRUE
 seasons_to_process <- if (full_build) all_seasons else current_season
 
 needed_tags <- c(
