@@ -175,6 +175,7 @@ if (full_build || is.null(prior_data)) {
       stat_type = "team",
       season_type = "REG+POST"
     )
+    current_data <- current_data |> add_nflverse_ids()
     full_data <- bind_rows(prev_data, current_data)
   }
 } else {
@@ -182,8 +183,6 @@ if (full_build || is.null(prior_data)) {
   cat("[nfl_stats_week_team_regpost] No new data. Using prior archive.\n")
   full_data <- prior_data
 }
-
-full_data <- full_data |> add_nflverse_ids()
 
 save_and_upload(
   tag         = tag,
@@ -234,6 +233,7 @@ if (full_build || is.null(prior_data)) {
       stat_type = "player",
       season_type = "REG+POST"
     )
+    current_data <- current_data |> add_nflverse_ids()
     full_data <- bind_rows(prev_data, current_data)
   }
 } else {
@@ -242,7 +242,6 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-full_data <- full_data |> add_nflverse_ids()
 
 save_and_upload(
   tag         = tag,
