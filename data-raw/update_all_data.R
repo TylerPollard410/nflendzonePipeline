@@ -399,6 +399,21 @@ archive_dir <- file.path("artifacts/data-archive", tag)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
 prior_data <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
 
+# if (full_build || should_rebuild(game_data |> filter(!is.na(result)),
+#                                  prior_data,
+#                                  id_cols = "season")) {
+#   cat("[season_standings] Recomputing standings...\n")
+#   full_data <- compute_season_standings_data(
+#     game_df = game_data |> filter(!is.na(result)),
+#     tol = 1e-3,
+#     max_iter = 200,
+#     print_message = TRUE
+#   )
+# } else {
+#   cat("[season_standings] No new seasons, using prior archive.\n")
+#   full_data <- prior_data
+# }
+
 if (full_build || should_rebuild(game_data |> filter(!is.na(result)),
                                  prior_data,
                                  id_cols = "season")) {
@@ -410,8 +425,26 @@ if (full_build || should_rebuild(game_data |> filter(!is.na(result)),
     print_message = TRUE
   )
 } else {
-  cat("[season_standings] No new seasons, using prior archive.\n")
-  full_data <- prior_data
+  # All previous seasons from archive
+  prev_data <- prior_data |> filter(season < seasons_to_process)
+  # Current season from latest games
+  curr_season_data <- game_data |> filter(!is.na(result), season == seasons_to_process)
+  # Optionally: skip if no new weeks/games
+  if (nrow(curr_season_data) == 0) {
+    cat("[season_standings] No current season games. Using prior archive.\n")
+    full_data <- prior_data
+  } else {
+    # INCREMENTAL: Only update current season
+    cat("[season_standings] Incrementally updating current season...\n")
+
+    current_standings <- compute_season_standings_data(
+      game_df = curr_season_data,
+      tol = 1e-3,
+      max_iter = 200,
+      print_message = TRUE
+    )
+    full_data <- bind_rows(prev_data, current_standings)
+  }
 }
 
 save_and_upload(
@@ -446,11 +479,7 @@ if (full_build || is.null(prior_data)) {
     reset = TRUE,
     print_message = TRUE
   )
-} else if (should_rebuild(game_data |> filter(!is.na(result)),
-                          prior_data,
-                          id_cols = c("season", "week"))) {
-  # INCREMENTAL: Only update current season
-  cat("[weekly_standings] Incrementally updating current season...\n")
+} else {
   # All previous seasons from archive
   prev_data <- prior_data |> filter(season < seasons_to_process)
   # Current season from latest games
@@ -460,6 +489,8 @@ if (full_build || is.null(prior_data)) {
     cat("[weekly_standings] No current season games. Using prior archive.\n")
     full_data <- prior_data
   } else {
+    # INCREMENTAL: Only update current season
+    cat("[weekly_standings] Incrementally updating current season...\n")
     current_standings <- compute_weekly_standings_data(
       game_df = curr_season_data,
       season_type = "ALL",
@@ -470,10 +501,6 @@ if (full_build || is.null(prior_data)) {
     )
     full_data <- bind_rows(prev_data, current_standings)
   }
-} else {
-  # NO UPDATE NEEDED
-  cat("[weekly_standings] No new data. Using prior archive.\n")
-  full_data <- prior_data
 }
 
 save_and_upload(
@@ -510,8 +537,12 @@ if (full_build || is.null(prior_data)) {
   )
 } else if (should_rebuild(game_data |> dplyr::filter(!is.na(result)),
                           prior_data,
-                          id_cols = c("season", "week"))) {
+                          id_cols = c("game_id", "season", "week"))) {
+  # All previous seasons from archive
+  prev_data <- prior_data |> filter(season < seasons_to_process)
+
   cat("[elo] Incrementally updating ELO data...\n")
+
   full_data <- compute_elo_data(
     game_df = game_data |> dplyr::filter(!is.na(result)),
     initial_elo = 1505,
@@ -520,7 +551,7 @@ if (full_build || is.null(prior_data)) {
     d = 400,
     apply_margin_multiplier = TRUE,
     season_factor = 0.65,
-    prior_data = prior_data,
+    prior_data = prev_data,
     verbose = TRUE
   )
 } else {
@@ -562,11 +593,11 @@ if (full_build || is.null(prior_data)) {
     max_iter = 200
   )
 } else {
-  current_weeks <- game_data |>
+  current_weeks <- game_data_long |>
     dplyr::filter(season %in% seasons_to_process, !is.na(result)) |>
-    dplyr::distinct(season, week)
-  prior_weeks <- prior_data |> dplyr::distinct(season, week)
-  new_weeks <- dplyr::anti_join(current_weeks, prior_weeks, by = c("season", "week"))
+    dplyr::distinct(season, week, team)
+  prior_weeks <- prior_data |> dplyr::distinct(season, week, team)
+  new_weeks <- dplyr::anti_join(current_weeks, prior_weeks, by = c("season", "week", "team"))
 
   if (nrow(new_weeks) == 0) {
     cat("[srs] No new weeks in game_data, using prior archive.\n")
@@ -574,7 +605,7 @@ if (full_build || is.null(prior_data)) {
   } else {
     cat("[srs] Incrementally updating SRS for new weeks...\n")
     weekGrid <- game_data |>
-      dplyr::filter(season %in% seasons_to_process, !is.na(result)) |>
+      dplyr::filter(!is.na(result)) |>
       dplyr::distinct(season, week) |>
       dplyr::arrange(season, week) |>
       dplyr::mutate(idx = dplyr::row_number())
@@ -596,7 +627,9 @@ if (full_build || is.null(prior_data)) {
     )
     new_ratings <- full_new |>
       dplyr::semi_join(new_weeks, by = c("season", "week"))
-    full_data <- dplyr::bind_rows(prior_data, new_ratings)
+    prev_data <- prior_data |>
+      dplyr::anti_join(new_ratings, by = c("season", "week", "team"))
+    full_data <- dplyr::bind_rows(prev_data, new_ratings)
   }
 }
 
@@ -631,8 +664,8 @@ if (full_build || is.null(prior_data)) {
 } else if (should_rebuild(
   pbp_data |> dplyr::filter(season %in% seasons_to_process),
   prior_data,
-  id_cols = "game_id"
-)) {
+  id_cols = "game_id")
+  ) {
   cat("[epa] Incrementally updating EPA data for seasons: ",
       paste(seasons_to_process, collapse = ", "), "...\n")
   # Drop prior data for seasons being updated
