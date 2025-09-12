@@ -12392,3 +12392,5 @@ game_id,season,week,team,opponent,location,turnover_diff,turnovers_won,turnovers
 2025_01_BAL_BUF,2025,1,BAL,BUF,away,-1,0,1,0,0,0,1
 2025_01_MIN_CHI,2025,1,CHI,MIN,home,1,1,0,1,0,0,0
 2025_01_MIN_CHI,2025,1,MIN,CHI,away,-1,0,1,0,0,1,0
+2025_02_WAS_GB,2025,2,GB,WAS,home,0,0,0,0,0,0,0
+2025_02_WAS_GB,2025,2,WAS,GB,away,0,0,0,0,0,0,0
