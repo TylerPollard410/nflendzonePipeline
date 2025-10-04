@@ -11,20 +11,27 @@
 #' @export
 #' @noRd
 compute_team_features_data <- function(
-    features,
-    archive_loc = "archive/data-archive",
-    file_type = "rds"
+  features,
+  archive_loc = "archive/data-archive",
+  file_type = "rds"
 ) {
-  stopifnot(is.character(features), is.character(archive_loc), is.character(file_type))
+  stopifnot(
+    is.character(features),
+    is.character(archive_loc),
+    is.character(file_type)
+  )
 
-  feature_data <- map(features, \(x) readRDS(paste0("artifacts/data-archive/", x, "/", paste0(x, ".rds"))))
+  feature_data <- map(features, \(x) {
+    readRDS(paste0("artifacts/data-archive/", x, "/", paste0(x, ".rds")))
+  })
   # purrr::iwalk(feature_data, \(df, name) {
   #   cat(glue::glue("---- Columns in '{name}' ----\n"))
   #   print(colnames(df))
   #   cat("\n")
   # })
 
-  feature_data[[3]] <- feature_data[[3]] |> dplyr::select(-home_team, -away_team)
+  feature_data[[3]] <- feature_data[[3]] |>
+    dplyr::select(-home_team, -away_team)
 
   feature_list_with_ids <- purrr::imap(feature_data, \(df, name) {
     message(glue::glue("Adding nflverse IDs to '{name}'..."))
@@ -37,13 +44,15 @@ compute_team_features_data <- function(
   # })
 
   # Step 1: Apply clean_homeaway() to first element
-  feature_list_with_ids[[1]] <- nflreadr::clean_homeaway(feature_list_with_ids[[1]])
+  feature_list_with_ids[[1]] <- nflreadr::clean_homeaway(feature_list_with_ids[[
+    1
+  ]])
 
   # Step 2: Join the rest to the cleaned first
   joined_df <- purrr::reduce(
-    feature_list_with_ids[-1],  # exclude the first element
-    .init = feature_list_with_ids[[1]],  # start with cleaned first df
-    ~ left_join(.x, .y, by = c("game_id", "season", "week", "team", "location"))
+    feature_list_with_ids[-1], # exclude the first element
+    .init = feature_list_with_ids[[1]], # start with cleaned first df
+    ~ full_join(.x, .y, by = c("game_id", "season", "week", "team", "location"))
   ) |>
     dplyr::select(-contains("."))
 
