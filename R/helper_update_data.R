@@ -8,10 +8,18 @@
 #' @return Logical: TRUE if a rebuild is needed, FALSE otherwise
 #' @export
 #' @noRd
-should_rebuild <- function(source_df, prior_df, id_cols = c("season", "week", "game_id")) {
-  if (is.null(prior_df) || nrow(prior_df) == 0) return(TRUE)
-  src_keys   <- source_df |> dplyr::distinct(dplyr::across(dplyr::all_of(id_cols)))
-  prior_keys <- prior_df  |> dplyr::distinct(dplyr::across(dplyr::all_of(id_cols)))
+should_rebuild <- function(
+  source_df,
+  prior_df,
+  id_cols = c("season", "week", "game_id")
+) {
+  if (is.null(prior_df) || nrow(prior_df) == 0) {
+    return(TRUE)
+  }
+  src_keys <- source_df |>
+    dplyr::distinct(dplyr::across(dplyr::all_of(id_cols)))
+  prior_keys <- prior_df |>
+    dplyr::distinct(dplyr::across(dplyr::all_of(id_cols)))
   missing <- dplyr::anti_join(src_keys, prior_keys, by = id_cols)
   nrow(missing) > 0
 }
@@ -30,25 +38,41 @@ should_rebuild <- function(source_df, prior_df, id_cols = c("season", "week", "g
 #' @export
 #' @noRd
 save_and_upload <- function(
-    tag, full_data, seasons, repo, archive_dir, upload = TRUE,
-    archive_formats = c("rds", "parquet", "csv")
+  tag,
+  full_data,
+  seasons,
+  repo,
+  archive_dir,
+  upload = TRUE,
+  archive_formats = c("rds", "parquet", "csv")
 ) {
   initial_conn <- as.integer(rownames(showConnections(all = TRUE)))
-  on.exit({
-    final_conn <- as.integer(rownames(showConnections(all = TRUE)))
-    new_conn <- setdiff(final_conn, initial_conn)
-    for (i in new_conn) try(close(getConnection(i)), silent = TRUE)
-  }, add = TRUE)
+  on.exit(
+    {
+      final_conn <- as.integer(rownames(showConnections(all = TRUE)))
+      new_conn <- setdiff(final_conn, initial_conn)
+      for (i in new_conn) {
+        try(close(getConnection(i)), silent = TRUE)
+      }
+    },
+    add = TRUE
+  )
 
   dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
 
   suppressWarnings({
-    if ("rds" %in% archive_formats)
+    if ("rds" %in% archive_formats) {
       saveRDS(full_data, file.path(archive_dir, paste0(tag, ".rds")))
-    if ("csv" %in% archive_formats)
+    }
+    if ("csv" %in% archive_formats) {
       readr::write_csv(full_data, file.path(archive_dir, paste0(tag, ".csv")))
-    if ("parquet" %in% archive_formats)
-      arrow::write_parquet(full_data, file.path(archive_dir, paste0(tag, ".parquet")))
+    }
+    if ("parquet" %in% archive_formats) {
+      arrow::write_parquet(
+        full_data,
+        file.path(archive_dir, paste0(tag, ".parquet"))
+      )
+    }
     ts_nflverse <- attr(full_data, "nflverse_timestamp")
     ts_txt <- if (is.null(ts_nflverse)) {
       # Assign the current time in New York time zone with label
@@ -80,7 +104,7 @@ save_and_upload <- function(
     # Per-season files (leave as-is unless you want archive_formats control here too)
     season_files <- purrr::map(seasons, \(season) {
       season_df <- full_data |> dplyr::filter(season == !!season)
-      pq_path  <- file.path(tempdir(), paste0(tag, "_", season, ".parquet"))
+      pq_path <- file.path(tempdir(), paste0(tag, "_", season, ".parquet"))
       rds_path <- file.path(tempdir(), paste0(tag, "_", season, ".rds"))
       csv_path <- file.path(tempdir(), paste0(tag, "_", season, ".csv"))
       suppressWarnings({
@@ -93,8 +117,8 @@ save_and_upload <- function(
     purrr::walk(season_files, \(filelist) {
       suppressWarnings({
         piggyback::pb_upload(filelist$parquet, repo = repo, tag = tag)
-        piggyback::pb_upload(filelist$rds,     repo = repo, tag = tag)
-        piggyback::pb_upload(filelist$csv,     repo = repo, tag = tag)
+        piggyback::pb_upload(filelist$rds, repo = repo, tag = tag)
+        piggyback::pb_upload(filelist$csv, repo = repo, tag = tag)
       })
       unlink(c(filelist$parquet, filelist$rds, filelist$csv))
     })
@@ -113,15 +137,17 @@ save_and_upload <- function(
 #' @export
 #' @noRd
 make_stats_filename <- function(
-    spec,
-    ext = "rds",
-    archive_dir = "artifacts/data-archive/nflverse_stats"
+  spec,
+  ext = "rds",
+  archive_dir = "artifacts/data-archive/nflverse_stats"
 ) {
-  sum_level    <- tolower(spec$sum_level)
-  stat_level   <- tolower(spec$stat_level)
+  sum_level <- tolower(spec$sum_level)
+  stat_level <- tolower(spec$stat_level)
   season_level <- tolower(spec$season_level)
-  ext          <- tolower(ext)
-  if (!season_level %in% c("reg", "post", "all")) stop("season_level must be 'REG', 'POST', or 'ALL'")
+  ext <- tolower(ext)
+  if (!season_level %in% c("reg", "post", "all")) {
+    stop("season_level must be 'REG', 'POST', or 'ALL'")
+  }
   fn <- paste(sum_level, stat_level, season_level, "stats", sep = "_")
   file.path(archive_dir, paste0(fn, ".", ext))
 }
@@ -134,9 +160,15 @@ make_stats_filename <- function(
 #' @noRd
 season_type_for_nflfastR <- function(season_level) {
   season_level <- toupper(season_level)
-  if (season_level == "ALL") return("REG+POST")
-  if (season_level == "REG") return("REG")
-  if (season_level == "POST") return("POST")
+  if (season_level == "ALL") {
+    return("REG+POST")
+  }
+  if (season_level == "REG") {
+    return("REG")
+  }
+  if (season_level == "POST") {
+    return("POST")
+  }
   stop("season_level must be 'REG', 'POST', or 'ALL'")
 }
 
@@ -152,7 +184,9 @@ season_type_for_nflfastR <- function(season_level) {
 #' @export
 #' @noRd
 add_nflverse_ids <- function(df, preserve_order = FALSE, schedules = NULL) {
-  if (is.null(schedules)) schedules <- nflreadr::load_schedules()
+  if (is.null(schedules)) {
+    schedules <- nflreadr::load_schedules()
+  }
   wide_map <- schedules |>
     dplyr::select(game_id, season, week, home_team, away_team, location) |>
     dplyr::mutate(
@@ -161,52 +195,206 @@ add_nflverse_ids <- function(df, preserve_order = FALSE, schedules = NULL) {
     )
   long_map <- nflreadr::clean_homeaway(wide_map)
   nms <- names(df)
-  if (preserve_order) df$.rowid <- seq_len(nrow(df))
+  if (preserve_order) {
+    df$.rowid <- seq_len(nrow(df))
+  }
   `%has%` <- function(x, y) all(y %in% x)
 
   # Try matches in decreasing order of specificity
   if (nms %has% c("game_id", "home_team", "away_team")) {
-    out <- dplyr::inner_join(wide_map, df, by = c("game_id", "home_team", "away_team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      wide_map,
+      df,
+      by = c("game_id", "home_team", "away_team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("game_id", "home_team")) {
-    out <- dplyr::inner_join(wide_map, df, by = c("game_id", "home_team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      wide_map,
+      df,
+      by = c("game_id", "home_team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("game_id", "away_team")) {
-    out <- dplyr::inner_join(wide_map, df, by = c("game_id", "away_team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      wide_map,
+      df,
+      by = c("game_id", "away_team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("game_id", "team", "opponent")) {
-    out <- dplyr::inner_join(long_map, df, by = c("game_id", "team", "opponent"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      long_map,
+      df,
+      by = c("game_id", "team", "opponent"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("game_id", "team")) {
-    out <- dplyr::inner_join(long_map, df, by = c("game_id", "team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      long_map,
+      df,
+      by = c("game_id", "team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("game_id", "opponent")) {
-    out <- dplyr::inner_join(long_map, df, by = c("game_id", "opponent"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      long_map,
+      df,
+      by = c("game_id", "opponent"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("season", "week", "home_team", "away_team")) {
-    out <- dplyr::inner_join(wide_map, df, by = c("season", "week", "home_team", "away_team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      wide_map,
+      df,
+      by = c("season", "week", "home_team", "away_team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("season", "week", "home_team")) {
-    out <- dplyr::inner_join(wide_map, df, by = c("season", "week", "home_team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      wide_map,
+      df,
+      by = c("season", "week", "home_team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("season", "week", "away_team")) {
-    out <- dplyr::inner_join(wide_map, df, by = c("season", "week", "away_team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      wide_map,
+      df,
+      by = c("season", "week", "away_team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("season", "week", "team", "opponent")) {
-    out <- dplyr::inner_join(long_map, df, by = c("season", "week", "team", "opponent"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      long_map,
+      df,
+      by = c("season", "week", "team", "opponent"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("season", "week", "team")) {
-    out <- dplyr::inner_join(long_map, df, by = c("season", "week", "team"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      long_map,
+      df,
+      by = c("season", "week", "team"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else if (nms %has% c("season", "week", "opponent")) {
-    out <- dplyr::inner_join(long_map, df, by = c("season", "week", "opponent"), suffix = c("", ".y")) |>
+    out <- dplyr::inner_join(
+      long_map,
+      df,
+      by = c("season", "week", "opponent"),
+      suffix = c("", ".y")
+    ) |>
       dplyr::select(-dplyr::ends_with(".y"))
   } else {
-    stop("Input must have at least (game_id and one of: home_team, away_team, team, opponent) OR (season, week, and one of: home_team, away_team, team, opponent)")
+    stop(
+      "Input must have at least (game_id and one of: home_team, away_team, team, opponent) OR (season, week, and one of: home_team, away_team, team, opponent)"
+    )
   }
 
   if (preserve_order && ".rowid" %in% names(out)) {
     out <- dplyr::arrange(out, .rowid) |> dplyr::select(-.rowid)
   }
   out
+}
+
+#' Add Flexible Net Features to a Data Frame
+#'
+#' Computes "net" features by applying a function (e.g., subtraction) to matched pairs of columns with
+#' configurable prefixes (e.g., home/away stats) and optional pattern matching. The new columns are named
+#' with a user-specified prefix (default: \code{"net_"}).
+#'
+#' @param df Data frame containing columns to combine (typically game-level or matchup-level features).
+#' @param var1_prefix Character prefix for the first group of columns (default: "home_").
+#' @param var2_prefix Character prefix for the second group of columns (default: "away_").
+#' @param pattern1 Regex pattern (without prefix) to match variable names after \code{var1_prefix} (default: ".*").
+#' @param pattern2 Regex pattern (without prefix) to match variable names after \code{var2_prefix} (default: ".*").
+#' @param fun Binary function to combine column pairs (default: \code{-}, i.e., subtraction).
+#' @param net_prefix Character prefix for new net features (default: "net_").
+#'
+#' @return A tibble (data.frame) containing the original columns plus new net features for each matched pair.
+#'
+#' @details
+#' Only columns with matching names (after removing the prefix and applying the pattern) will be combined.
+#' If columns do not match 1:1, the function will error. If no columns match, the original data is returned unchanged.
+#'
+#' @examples
+#' \dontrun{
+#' df_with_nets <- add_flexible_net_features(df)
+#' }
+#'
+#' @importFrom stringr str_which str_replace
+#' @importFrom purrr map2_dfc
+#' @importFrom tibble tibble
+#' @importFrom dplyr bind_cols
+#' @export
+#' @noRd
+add_flexible_net_features <- function(
+  df,
+  var1_prefix = "home_",
+  var2_prefix = "away_",
+  pattern1 = ".*",
+  pattern2 = ".*",
+  fun = `-`,
+  net_prefix = "net_",
+  order_by_team = TRUE
+) {
+  regex1 <- paste0("^", var1_prefix, "(", pattern1, ")(?=_|$|\\b)")
+  regex2 <- paste0("^", var2_prefix, "(", pattern2, ")(?=_|$|\\b)")
+  var1_idx <- stringr::str_which(names(df), regex1)
+  var2_idx <- stringr::str_which(names(df), regex2)
+  var1_names <- names(df)[var1_idx]
+  var2_names <- names(df)[var2_idx]
+
+  # Must be same length and matching order!
+  if (length(var1_names) == 0 || length(var2_names) == 0) {
+    return(df)
+  }
+  if (length(var1_names) != length(var2_names)) {
+    stop("home/away columns found do not match 1:1. Check your regex patterns.")
+  }
+
+  net_names <- stringr::str_replace(
+    var1_names,
+    paste0("^", var1_prefix),
+    net_prefix
+  )
+
+  net_df <- purrr::map2_dfc(
+    var1_names,
+    var2_names,
+    ~ tibble::tibble(
+      !!dplyr::sym(stringr::str_replace(
+        .x,
+        paste0("^", var1_prefix),
+        net_prefix
+      )) := fun(df[[.x]], df[[.y]])
+    )
+  )
+
+  df2 <- dplyr::bind_cols(df, net_df)
+
+  # Optional: relocate net columns after the corresponding away columns
+  if (!order_by_team) {
+    for (j in seq_along(net_names)) {
+      df2 <- df2 |>
+        dplyr::relocate(
+          dplyr::all_of(net_names[j]),
+          .after = dplyr::all_of(var2_names[j])
+        )
+    }
+  }
+
+  df2
 }
