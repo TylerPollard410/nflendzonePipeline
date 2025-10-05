@@ -70,4 +70,5 @@ jobs:
 
       - name: Run team strength model pipeline
         run: |
+          mkdir -p artifacts/model-archive/team_strength
           Rscript data-raw/update_team_strength_model.R
