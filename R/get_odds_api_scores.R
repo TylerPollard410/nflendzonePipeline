@@ -2,7 +2,7 @@
 #'
 #' Returns upcoming, live, and recently completed games (with scores if available) for a given sport.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param daysFrom Optional. Integer 1–3: how many days back to return completed games. If missing, only live/upcoming games are returned.
 #' @param dateFormat Optional. Timestamp format: "iso" (default) or "unix".

@@ -2,7 +2,7 @@
 #'
 #' Returns upcoming and live games with recent odds for a given sport, region and market.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()]. Use \code{"upcoming"} for all live and next 8 upcoming games across all sports.
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}. Use \code{"upcoming"} for all live and next 8 upcoming games across all sports.
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param regions Bookmaker regions to return. Valid values: \code{"us"}, \code{"us2"}, \code{"uk"}, \code{"au"}, \code{"eu"}. Default is \code{"us"}.
 #' @param markets Odds markets to return. Default is \code{"h2h"} (moneyline). Also: \code{"spreads"}, \code{"totals"}, \code{"outrights"} (comma-separated allowed).

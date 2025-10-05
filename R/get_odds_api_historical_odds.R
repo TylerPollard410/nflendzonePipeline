@@ -2,7 +2,7 @@
 #'
 #' Returns a snapshot of games with bookmaker odds for a given sport, region, and market at a specified historical timestamp.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
 #' @param date Snapshot timestamp in ISO8601 format (e.g., "2023-10-10T12:10:39Z").
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param regions Bookmaker regions to return. Valid values: "us", "us2", "uk", "au", "eu". Default is "us".

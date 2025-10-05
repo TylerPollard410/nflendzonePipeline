@@ -2,7 +2,7 @@
 #'
 #' Returns a list of historical events (games) as they appeared in the API at the specified timestamp (no odds).
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
 #' @param date Snapshot timestamp in ISO8601 format (e.g., "2023-10-10T12:10:39Z").
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param dateFormat Format for timestamps: "iso" (default) or "unix".

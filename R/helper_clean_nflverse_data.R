@@ -170,7 +170,7 @@ clean_teamopponent <- function(df,
 #'   pbp2 <- clean_team_abbrs_auto(pbp, verbose = TRUE)
 #'   attr(pbp2, "cleaned_cols")
 #' }
-#' @importFrom nflreadr clean_team_abbrs team_abbr_mapping
+#' @importFrom nflreadr clean_team_abbrs
 #' @export
 #' @noRd
 clean_team_abbrs_auto <- function(x, verbose = FALSE) {

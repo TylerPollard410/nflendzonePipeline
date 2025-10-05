@@ -3,7 +3,7 @@
 #' Returns a list of in-play and pre-match events (with event id, teams, and commence time) for a specified sport or league.
 #' Odds are not included. This endpoint does not count against the usage quota.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param dateFormat Optional. Timestamp format: "iso" (default) or "unix".
 #' @param eventIds Optional. Comma-separated game ids to filter results.
