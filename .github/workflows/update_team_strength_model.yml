@@ -53,7 +53,7 @@ jobs:
             "nflfastR", 
             "nflseedR"
           ), repos = "https://cloud.r-project.org")'
-          Rscript -e 'install.packages("cmdstanr", repos = c('https://stan-dev.r-universe.dev', getOption("repos")))'
+          Rscript -e 'install.packages("cmdstanr", repos = c("https://stan-dev.r-universe.dev", getOption("repos")))'
           Rscript -e 'remotes::install_github(c(
             "TylerPollard410/nflendzoneModel",
             "TylerPollard410/nflendzone"
