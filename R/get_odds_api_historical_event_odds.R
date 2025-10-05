@@ -2,8 +2,8 @@
 #'
 #' Returns historical odds for a single event as they appeared at a specified timestamp.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
-#' @param eventId The event ID (from [get_odds_api_historical_events()]).
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
+#' @param eventId The event ID (from \code{\link{get_odds_api_historical_events}}).
 #' @param date Snapshot timestamp in ISO8601 format (e.g., "2023-11-29T22:42:00Z").
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param regions Bookmaker regions to return. Valid values: "us", "us2", "uk", "au", "eu". Default is "us".

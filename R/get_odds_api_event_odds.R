@@ -2,8 +2,8 @@
 #'
 #' Returns odds for a single event (game) for any supported market and bookmaker.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
-#' @param eventId The id of the event (from the "id" field of [get_odds_api_events()]).
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
+#' @param eventId The id of the event (from the "id" field of \code{\link{get_odds_api_events}}).
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param regions Bookmaker regions to return. Valid values: "us", "us2", "uk", "au", "eu". Default is "us".
 #' @param markets Odds markets to return. Can be **any supported market key** (see [all markets](https://the-odds-api.com/sports-odds-data/betting-markets.html)), not just featured. Use comma-separated market keys or "all" for all available. Default is "h2h".

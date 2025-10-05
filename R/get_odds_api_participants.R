@@ -2,7 +2,7 @@
 #'
 #' Returns all participants (teams or players) for a given sport. For most US sports, these will be teams; for individual sports, these may be players.
 #'
-#' @param sport The sport key as obtained from [get_odds_api_sports()].
+#' @param sport The sport key as obtained from \code{\link{get_odds_api_sports}}.
 #' @param api_key Optional. Odds API key. If NULL, will use Sys.getenv("ODDS_API_KEY").
 #' @param ... Reserved for future API parameters not yet documented.
 #' @return A tibble with columns: id (participant id), full_name (team/player name).

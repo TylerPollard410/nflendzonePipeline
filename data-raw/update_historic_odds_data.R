@@ -4,7 +4,6 @@
 # Part of the nflendzonePipeline (used after update_all_data.R)
 # ============================================================================ #
 
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 # 1. LIBRARIES ----
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
@@ -108,9 +107,11 @@ seasons_to_process <- 2020:current_season
 
 # Data repo for piggyback releases
 github_data_repo <- "TylerPollard410/nflendzoneData"
-github_releases_base_url <- paste0("https://github.com/",
-                                   github_data_repo,
-                                   "/releases/download/")
+github_releases_base_url <- paste0(
+  "https://github.com/",
+  github_data_repo,
+  "/releases/download/"
+)
 
 needed_tags <- c(
   # historic odds
@@ -128,9 +129,9 @@ needed_tags <- c(
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 
 suppressWarnings({
-  purrr::walk(needed_tags,
-              ~ piggyback::pb_new_release(repo = github_data_repo,
-                                          tag = .x)
+  purrr::walk(
+    needed_tags,
+    ~ piggyback::pb_new_release(repo = github_data_repo, tag = .x)
   )
 })
 
@@ -142,24 +143,55 @@ suppressWarnings({
 teams_data <- load_teams(current = TRUE)
 
 ## features ----
-game_features <- rds_from_url(paste0(github_releases_base_url, "game_features/game_features", ".rds"))
-team_features <- rds_from_url(paste0(github_releases_base_url, "team_features/team_features", ".rds"))
+game_features <- rds_from_url(paste0(
+  github_releases_base_url,
+  "game_features/game_features",
+  ".rds"
+))
+team_features <- rds_from_url(paste0(
+  github_releases_base_url,
+  "team_features/team_features",
+  ".rds"
+))
 
 ## model ----
-game_model <- rds_from_url(paste0(github_releases_base_url, "game_model/game_model", ".rds"))
-team_model <- rds_from_url(paste0(github_releases_base_url, "team_model/team_model", ".rds"))
+game_model <- rds_from_url(paste0(
+  github_releases_base_url,
+  "game_model/game_model",
+  ".rds"
+))
+team_model <- rds_from_url(paste0(
+  github_releases_base_url,
+  "team_model/team_model",
+  ".rds"
+))
 
 ## completed ----
 # Filter for completed games
 completed_games <- game_model |>
   filter(!is.na(result)) |>
-  select(game_id, season, week, week_seq, season_type,
-         gameday, weekday, gametime, time_of_day,
-         home_team, away_team, location) |>
+  select(
+    game_id,
+    season,
+    week,
+    week_seq,
+    season_type,
+    gameday,
+    weekday,
+    gametime,
+    time_of_day,
+    home_team,
+    away_team,
+    location
+  ) |>
   mutate(
     odds_gametime = paste(gameday, gametime),
     odds_gametime = ymd_hm(odds_gametime, tz = "America/New_York"),
-    odds_gametime = format_ISO8601(odds_gametime, usetz = "Z", precision = "ymdhms")
+    odds_gametime = format_ISO8601(
+      odds_gametime,
+      usetz = "Z",
+      precision = "ymdhms"
+    )
   ) |>
   mutate(
     odds_week_start = min(odds_gametime),
@@ -198,24 +230,40 @@ historic_events <- historic_games_unique |>
     event_data = list({
       events <- get_odds_api_historical_events(
         sport = sport_var,
-        date = format_ISO8601(as_datetime(odds_week_start), usetz = "Z", precision = "ymdhms"),
+        date = format_ISO8601(
+          as_datetime(odds_week_start),
+          usetz = "Z",
+          precision = "ymdhms"
+        ),
         dateFormat = "iso",
         oddsFormat = "decimal",
         eventIds = NULL,
-        commenceTimeFrom = format_ISO8601(as_datetime(odds_week_start) - hours(1), usetz = "Z", precision = "ymdhms"),
-        commenceTimeTo = format_ISO8601(as_datetime(odds_week_end) + hours(1), usetz = "Z", precision = "ymdhms")
+        commenceTimeFrom = format_ISO8601(
+          as_datetime(odds_week_start) - hours(1),
+          usetz = "Z",
+          precision = "ymdhms"
+        ),
+        commenceTimeTo = format_ISO8601(
+          as_datetime(odds_week_end) + hours(1),
+          usetz = "Z",
+          precision = "ymdhms"
+        )
       )
-      if (nrow(events) > 0) events else tibble(
-        timestamp = NA_character_,
-        previous_timestamp = NA_character_,
-        next_timestamp = NA_character_,
-        id = NA_character_,
-        sport_key = NA_character_,
-        sport_title = NA_character_,
-        commence_time = NA_character_,
-        home_team = NA_character_,
-        away_team = NA_character_
-      )
+      if (nrow(events) > 0) {
+        events
+      } else {
+        tibble(
+          timestamp = NA_character_,
+          previous_timestamp = NA_character_,
+          next_timestamp = NA_character_,
+          id = NA_character_,
+          sport_key = NA_character_,
+          sport_title = NA_character_,
+          commence_time = NA_character_,
+          home_team = NA_character_,
+          away_team = NA_character_
+        )
+      }
     })
   ) |>
   ungroup() |>
@@ -223,10 +271,18 @@ historic_events <- historic_games_unique |>
 
 get_odds_api_usage()
 
-historic_events <-  historic_events |>
+historic_events <- historic_events |>
   mutate(
-    home_team = ifelse(home_team == "Washington Football Team", "Washington Commanders", home_team),
-    away_team = ifelse(away_team == "Washington Football Team", "Washington Commanders", away_team)
+    home_team = ifelse(
+      home_team == "Washington Football Team",
+      "Washington Commanders",
+      home_team
+    ),
+    away_team = ifelse(
+      away_team == "Washington Football Team",
+      "Washington Commanders",
+      away_team
+    )
   ) |>
   left_join(
     teams_data |> select(home_team_abbr = team_abbr, team_name),
@@ -241,15 +297,25 @@ historic_events <-  historic_events |>
   ) |>
   relocate(away_team_abbr, .after = away_team) |>
   #select(-home_team, -away_team) |>
-  rename(home_team_name = home_team,
-         away_team_name = away_team,
-         home_team = home_team_abbr,
-         away_team = away_team_abbr)
+  rename(
+    home_team_name = home_team,
+    away_team_name = away_team,
+    home_team = home_team_abbr,
+    away_team = away_team_abbr
+  )
 
 historic_events <- historic_games |>
   left_join(
     historic_events,
-    by = join_by(season, week, week_seq, home_team, away_team, odds_week_start, odds_week_end)
+    by = join_by(
+      season,
+      week,
+      week_seq,
+      home_team,
+      away_team,
+      odds_week_start,
+      odds_week_end
+    )
   )
 #glimpse(historic_events_games)
 get_odds_api_usage()
@@ -257,11 +323,11 @@ get_odds_api_usage()
 full_data <- historic_events
 
 save_and_upload(
-  tag         = tag,
-  full_data   = full_data,
+  tag = tag,
+  full_data = full_data,
   #seasons     = all_seasons,
-  seasons     = seasons_to_process,
-  repo        = github_data_repo,
+  seasons = seasons_to_process,
+  repo = github_data_repo,
   archive_dir = archive_dir,
   upload = TRUE,
   archive_formats = c("rds", "parquet")
@@ -330,10 +396,12 @@ historical_game_odds <- historic_odds |>
   ) |>
   relocate(away_team_abbr, .after = away_team) |>
   #select(-home_team, -away_team) |>
-  rename(home_team_name = home_team,
-         away_team_name = away_team,
-         home_team = home_team_abbr,
-         away_team = away_team_abbr)
+  rename(
+    home_team_name = home_team,
+    away_team_name = away_team,
+    home_team = home_team_abbr,
+    away_team = away_team_abbr
+  )
 
 # historical_game_odds2 <- historic_games |>
 #   right_join(
@@ -362,40 +430,59 @@ historical_game_odds <- historic_odds |>
 #     values_from = c("outcomes_point")
 #   )
 
-
 # 2. Attach game_id/game meta by fuzzy week matching
 historical_game_odds <- historic_games |>
   right_join(
     historical_game_odds,
-    by = join_by(home_team, away_team, between(y$commence_time, x$odds_week_start, x$odds_week_end))
+    by = join_by(
+      home_team,
+      away_team,
+      between(y$commence_time, x$odds_week_start, x$odds_week_end)
+    )
   ) |>
   mutate(
     market_side = case_when(
-      market_key == "spreads" & outcomes_name == home_team_name ~ "home_spreads_odds",
-      market_key == "spreads" & outcomes_name == away_team_name ~ "away_spreads_odds",
-      market_key == "totals"  & outcomes_name == "Over"        ~ "overs_odds",
-      market_key == "totals"  & outcomes_name == "Under"       ~ "unders_odds",
-      market_key == "h2h"     & outcomes_name == home_team_name ~ "home_h2h_odds",
-      market_key == "h2h"     & outcomes_name == away_team_name ~ "away_h2h_odds",
+      market_key == "spreads" & outcomes_name == home_team_name ~
+        "home_spreads_odds",
+      market_key == "spreads" & outcomes_name == away_team_name ~
+        "away_spreads_odds",
+      market_key == "totals" & outcomes_name == "Over" ~ "overs_odds",
+      market_key == "totals" & outcomes_name == "Under" ~ "unders_odds",
+      market_key == "h2h" & outcomes_name == home_team_name ~ "home_h2h_odds",
+      market_key == "h2h" & outcomes_name == away_team_name ~ "away_h2h_odds",
       TRUE ~ NA_character_
     ),
     # Spread line: always from home team perspective (flip if away)
     spreads_line = case_when(
-      market_key == "spreads" & outcomes_name == home_team_name ~ -outcomes_point,
-      market_key == "spreads" & outcomes_name == away_team_name ~  outcomes_point,
+      market_key == "spreads" & outcomes_name == home_team_name ~
+        -outcomes_point,
+      market_key == "spreads" & outcomes_name == away_team_name ~
+        outcomes_point,
       TRUE ~ NA_real_
     ),
     totals_line = if_else(market_key == "totals", outcomes_point, NA_real_)
   ) |>
   mutate(
-    spreads_line      = first(na.omit(spreads_line)),
-    totals_line       = first(na.omit(totals_line)),
-    home_spreads_odds = first(outcomes_price[market_side == "home_spreads_odds" & !is.na(market_side)]),
-    away_spreads_odds = first(outcomes_price[market_side == "away_spreads_odds" & !is.na(market_side)]),
-    overs_odds        = first(outcomes_price[market_side == "overs_odds" & !is.na(market_side)]),
-    unders_odds       = first(outcomes_price[market_side == "unders_odds" & !is.na(market_side)]),
-    home_h2h_odds     = first(outcomes_price[market_side == "home_h2h_odds" & !is.na(market_side)]),
-    away_h2h_odds     = first(outcomes_price[market_side == "away_h2h_odds" & !is.na(market_side)]),
+    spreads_line = first(na.omit(spreads_line)),
+    totals_line = first(na.omit(totals_line)),
+    home_spreads_odds = first(outcomes_price[
+      market_side == "home_spreads_odds" & !is.na(market_side)
+    ]),
+    away_spreads_odds = first(outcomes_price[
+      market_side == "away_spreads_odds" & !is.na(market_side)
+    ]),
+    overs_odds = first(outcomes_price[
+      market_side == "overs_odds" & !is.na(market_side)
+    ]),
+    unders_odds = first(outcomes_price[
+      market_side == "unders_odds" & !is.na(market_side)
+    ]),
+    home_h2h_odds = first(outcomes_price[
+      market_side == "home_h2h_odds" & !is.na(market_side)
+    ]),
+    away_h2h_odds = first(outcomes_price[
+      market_side == "away_h2h_odds" & !is.na(market_side)
+    ]),
     .by = c("game_id", "bookmaker_key"),
     .keep = "all"
   )
@@ -406,14 +493,26 @@ historical_game_odds4 <- historical_game_odds3 |>
   #   game_id, season, week, home_team, away_team, gameday, gametime, bookmaker_key, bookmaker
   # ) |>
   mutate(
-    spreads_line      = first(na.omit(spreads_line)),
-    totals_line       = first(na.omit(totals_line)),
-    home_spreads_odds = first(outcomes_price[market_side == "home_spreads_odds" & !is.na(market_side)]),
-    away_spreads_odds = first(outcomes_price[market_side == "away_spreads_odds" & !is.na(market_side)]),
-    overs_odds        = first(outcomes_price[market_side == "overs_odds" & !is.na(market_side)]),
-    unders_odds       = first(outcomes_price[market_side == "unders_odds" & !is.na(market_side)]),
-    home_h2h_odds     = first(outcomes_price[market_side == "home_h2h_odds" & !is.na(market_side)]),
-    away_h2h_odds     = first(outcomes_price[market_side == "away_h2h_odds" & !is.na(market_side)]),
+    spreads_line = first(na.omit(spreads_line)),
+    totals_line = first(na.omit(totals_line)),
+    home_spreads_odds = first(outcomes_price[
+      market_side == "home_spreads_odds" & !is.na(market_side)
+    ]),
+    away_spreads_odds = first(outcomes_price[
+      market_side == "away_spreads_odds" & !is.na(market_side)
+    ]),
+    overs_odds = first(outcomes_price[
+      market_side == "overs_odds" & !is.na(market_side)
+    ]),
+    unders_odds = first(outcomes_price[
+      market_side == "unders_odds" & !is.na(market_side)
+    ]),
+    home_h2h_odds = first(outcomes_price[
+      market_side == "home_h2h_odds" & !is.na(market_side)
+    ]),
+    away_h2h_odds = first(outcomes_price[
+      market_side == "away_h2h_odds" & !is.na(market_side)
+    ]),
     .by = c("game_id", "bookmaker_key"),
     .keep = "all"
   )
@@ -453,7 +552,11 @@ tag <- "game_spreads"
 archive_dir <- file.path("artifacts/data-archive", tag)
 dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
-prior_spread_odds <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+prior_spread_odds <- if (file.exists(full_rds_path)) {
+  readRDS(full_rds_path)
+} else {
+  NULL
+}
 
 if (!is.null(prior_spread_odds) && !full_build) {
   games_to_get <- anti_join(completed_games, prior_spread_odds, by = "game_id")
@@ -461,16 +564,19 @@ if (!is.null(prior_spread_odds) && !full_build) {
     cat("[game_spreads] No new completed games. Skipping odds fetch.\n")
     spread_odds_final <- prior_spread_odds
   } else {
-    cat(glue("[game_spreads] Fetching odds for {nrow(games_to_get)} new games...\n"))
+    cat(glue(
+      "[game_spreads] Fetching odds for {nrow(games_to_get)} new games...\n"
+    ))
   }
 } else {
-  cat("[game_spreads] No prior archive or full build requested. Processing ALL games.\n")
+  cat(
+    "[game_spreads] No prior archive or full build requested. Processing ALL games.\n"
+  )
   games_to_get <- completed_games
 }
 
 # Only fetch odds if new games exist
 if (exists("games_to_get") && nrow(games_to_get) > 0) {
-
   # Helper to find the event and fetch all odds snapshots for a given game
   fetch_game_spread_history <- function(game_row) {
     # Lookup event in Odds API (by date and teams)
@@ -489,7 +595,9 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
         str_to_upper(away_team) == str_to_upper(game_row$away_team),
         as.Date(commence_time) == as.Date(game_row$gametime)
       )
-    if (nrow(event) == 0) return(NULL)
+    if (nrow(event) == 0) {
+      return(NULL)
+    }
     event_id <- event$id[1]
     event_time <- event$commence_time[1]
 
@@ -501,7 +609,9 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
       date = event_time,
       markets = "spreads"
     )
-    if (nrow(snap) == 0) return(NULL)
+    if (nrow(snap) == 0) {
+      return(NULL)
+    }
     snapshot_list[[1]] <- snap
 
     while (!is.na(snap$previous_timestamp[1])) {
@@ -511,7 +621,9 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
         date = snap$previous_timestamp[1],
         markets = "spreads"
       )
-      if (nrow(snap) == 0) break
+      if (nrow(snap) == 0) {
+        break
+      }
       snapshot_list[[length(snapshot_list) + 1]] <- snap
     }
     odds_all <- bind_rows(snapshot_list)
@@ -520,22 +632,26 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
       filter(market_key == "spreads", outcomes_name == game_row$home_team) |>
       mutate(spread = outcomes_point)
     spread_vals <- home_spreads$spread
-    if (length(spread_vals) == 0) return(NULL)
+    if (length(spread_vals) == 0) {
+      return(NULL)
+    }
     tibble(
-      game_id      = game_row$game_id,
-      season       = game_row$season,
-      week         = game_row$week,
-      home_team    = game_row$home_team,
-      away_team    = game_row$away_team,
-      open_spread  = spread_vals[length(spread_vals)],
+      game_id = game_row$game_id,
+      season = game_row$season,
+      week = game_row$week,
+      home_team = game_row$home_team,
+      away_team = game_row$away_team,
+      open_spread = spread_vals[length(spread_vals)],
       close_spread = spread_vals[1],
-      min_spread   = min(spread_vals, na.rm = TRUE),
-      max_spread   = max(spread_vals, na.rm = TRUE)
+      min_spread = min(spread_vals, na.rm = TRUE),
+      max_spread = max(spread_vals, na.rm = TRUE)
     )
   }
 
   spread_odds_new <- purrr::map_dfr(seq_len(nrow(games_to_get)), function(i) {
-    tryCatch(fetch_game_spread_history(games_to_get[i,]), error = function(e) NULL)
+    tryCatch(fetch_game_spread_history(games_to_get[i, ]), error = function(e) {
+      NULL
+    })
   })
 
   spread_odds_final <- if (!is.null(prior_spread_odds) && !full_build) {
@@ -558,13 +674,19 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
 # 5. PLAYER-LEVEL RUSHING YARDS PROPS ----
 # ============================================================================ #
 
-cat("========== [Player-Level] Updating Historical Rushing Yards Props ==========\n")
+cat(
+  "========== [Player-Level] Updating Historical Rushing Yards Props ==========\n"
+)
 
 tag <- "player_rush_props"
 archive_dir <- file.path("artifacts/data-archive", tag)
 dir.create(archive_dir, recursive = TRUE, showWarnings = FALSE)
 full_rds_path <- file.path(archive_dir, paste0(tag, ".rds"))
-prior_rush_props <- if (file.exists(full_rds_path)) readRDS(full_rds_path) else NULL
+prior_rush_props <- if (file.exists(full_rds_path)) {
+  readRDS(full_rds_path)
+} else {
+  NULL
+}
 
 if (!is.null(prior_rush_props) && !full_build) {
   games_to_get <- anti_join(completed_games, prior_rush_props, by = "game_id")
@@ -572,15 +694,18 @@ if (!is.null(prior_rush_props) && !full_build) {
     cat("[player_rush_props] No new completed games. Skipping props fetch.\n")
     rush_props_final <- prior_rush_props
   } else {
-    cat(glue("[player_rush_props] Fetching props for {nrow(games_to_get)} new games...\n"))
+    cat(glue(
+      "[player_rush_props] Fetching props for {nrow(games_to_get)} new games...\n"
+    ))
   }
 } else {
-  cat("[player_rush_props] No prior archive or full build requested. Processing ALL games.\n")
+  cat(
+    "[player_rush_props] No prior archive or full build requested. Processing ALL games.\n"
+  )
   games_to_get <- completed_games
 }
 
 if (exists("games_to_get") && nrow(games_to_get) > 0) {
-
   fetch_player_rush_props <- function(game_row) {
     events <- get_odds_api_events(
       sport = "americanfootball_nfl",
@@ -596,7 +721,9 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
         str_to_upper(away_team) == str_to_upper(game_row$away_team),
         as.Date(commence_time) == as.Date(game_row$gametime)
       )
-    if (nrow(event) == 0) return(NULL)
+    if (nrow(event) == 0) {
+      return(NULL)
+    }
     event_id <- event$id[1]
     event_time <- event$commence_time[1]
 
@@ -607,7 +734,9 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
       date = event_time,
       markets = "player_rushing_yards"
     )
-    if (nrow(snap) == 0) return(NULL)
+    if (nrow(snap) == 0) {
+      return(NULL)
+    }
     snapshot_list[[1]] <- snap
 
     while (!is.na(snap$previous_timestamp[1])) {
@@ -617,7 +746,9 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
         date = snap$previous_timestamp[1],
         markets = "player_rushing_yards"
       )
-      if (nrow(snap) == 0) break
+      if (nrow(snap) == 0) {
+        break
+      }
       snapshot_list[[length(snapshot_list) + 1]] <- snap
     }
     odds_all <- bind_rows(snapshot_list)
@@ -627,21 +758,23 @@ if (exists("games_to_get") && nrow(games_to_get) > 0) {
       select(outcomes_description, outcomes_point, timestamp) |>
       group_by(outcomes_description) |>
       summarise(
-        game_id    = game_row$game_id,
-        season     = game_row$season,
-        week       = game_row$week,
-        player     = outcomes_description[1],
-        open_line  = outcomes_point[which.max(timestamp)],
+        game_id = game_row$game_id,
+        season = game_row$season,
+        week = game_row$week,
+        player = outcomes_description[1],
+        open_line = outcomes_point[which.max(timestamp)],
         close_line = outcomes_point[which.min(timestamp)],
-        min_line   = min(outcomes_point, na.rm = TRUE),
-        max_line   = max(outcomes_point, na.rm = TRUE),
+        min_line = min(outcomes_point, na.rm = TRUE),
+        max_line = max(outcomes_point, na.rm = TRUE),
         .groups = "drop"
       )
     player_props
   }
 
   rush_props_new <- purrr::map_dfr(seq_len(nrow(games_to_get)), function(i) {
-    tryCatch(fetch_player_rush_props(games_to_get[i,]), error = function(e) NULL)
+    tryCatch(fetch_player_rush_props(games_to_get[i, ]), error = function(e) {
+      NULL
+    })
   })
 
   rush_props_final <- if (!is.null(prior_rush_props) && !full_build) {

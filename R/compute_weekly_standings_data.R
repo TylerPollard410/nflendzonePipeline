@@ -1,7 +1,7 @@
 #' Compute weekly SRS standings across all seasons and weeks (wide input)
 #'
 #' @param game_df      Wide-format games data: season, week, season_type, home_team, away_team, home_score, away_score, result, etc.
-#' @param season_type  Filter for season_type ("REG", "POST", or "ALL") [default "ALL"]
+#' @param season_type  Filter for season_type ("REG", "POST", or "ALL"). Default is "ALL".
 #' @param tol          Numeric tolerance for SRS convergence (default 1e-3)
 #' @param max_iter     Maximum iterations for convergence (default 100)
 #' @param reset        TRUE (reset per season), FALSE (cumulative), or integer (rolling window)
