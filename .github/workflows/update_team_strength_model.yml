@@ -37,7 +37,7 @@ jobs:
           Rscript -e 'install.packages(c(
             "remotes", "cmdstanr", "posterior", "tidybayes", "arrow",
             "dplyr", "lubridate", "piggyback", "purrr", "stringr",
-            "readr", "tibble", "tidyr", "glue", "nflreadr",
+            "readr", "tibble", "tidyr", "glue", "slider", "nflreadr",
             "nflfastR", "nflseedR"
           ), repos = "https://cloud.r-project.org")'
           Rscript -e 'remotes::install_github(c(
