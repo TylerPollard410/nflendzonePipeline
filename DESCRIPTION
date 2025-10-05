@@ -9,7 +9,7 @@ Description: Provides data processing, transformation, and ETL scripts for
 License: MIT + file LICENSE
 URL: https://github.com/TylerPollard410/nflendzonePipeline
 BugReports: https://github.com/TylerPollard410/nflendzonePipeline/issues
-Imports: 
+Imports:
     arrow,
     dplyr,
     future,
@@ -24,7 +24,6 @@ Imports:
     purrr,
     readr,
     slider,
-    stats,
     stringr,
     tibble,
     tidyr,
