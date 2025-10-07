@@ -2,6 +2,7 @@
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^README\.Rmd$
+^README\.qmd$
 ^CODE_OF_CONDUCT\.md$
 ^artifacts$
 ^vignettes/\.quarto$
