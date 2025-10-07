@@ -1,5 +1,6 @@
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+<!-- README.md is generated from README.qmd. Please edit that file -->
 
 # nflendzonePipeline
 
@@ -9,7 +10,13 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
 
-The goal of nflendzonePipeline is to …
+**Automated NFL game predictions and team strength estimates using
+Bayesian state-space models.**
+
+This package provides an automated pipeline for NFL analytics, with
+weekly updates powered by GitHub Actions. The visualizations below are
+automatically updated each week with the latest predictions and team
+rankings.
 
 ## Installation
 
@@ -21,11 +28,701 @@ You can install the development version of nflendzonePipeline from
 pak::pak("TylerPollard410/nflendzonePipeline")
 ```
 
-## Example
+## Weekly Report
 
-This is a basic example which shows you how to solve a common problem:
+This report provides weekly updates on NFL team strength estimates, home
+field advantage, and game predictions using Bayesian state-space models.
 
 ``` r
+library(tidyverse)
+library(posterior)
+library(distributional)
+library(tidybayes)
+library(ggdist)
+library(bayesplot)
+library(patchwork)
+library(nflreadr)
+library(nflplotR)
+library(nflendzone)
+library(nflendzoneModel)
 library(nflendzonePipeline)
-## basic example code
+
+theme_set(theme_ggdist())
 ```
+
+### Data Setup
+
+Load game data and team information from all available seasons.
+
+``` r
+all_seasons <- 2002:nflreadr::most_recent_season()
+teams_data <- nflreadr::load_teams(current = TRUE)
+game_data <- load_game_data(seasons = all_seasons)
+game_data_long <- load_game_data_long(game_df = game_data)
+season_weeks_df <- game_data |>
+  dplyr::distinct(season, week, week_seq)
+
+base_repo_url <-
+  "https://github.com/TylerPollard410/nflendzoneData/releases/download/"
+```
+
+``` r
+# Function to load timestamps and estimates for a given set of tags
+load_estimates_data <- function(tags, base_url) {
+  # Load timestamps
+  timestamps <- purrr::map(
+    tags,
+    ~ {
+      timestamp_url <-
+        paste0(base_url, .x, "/", .x, "_timestamp.json")
+      jsonlite::fromJSON(timestamp_url)
+    }
+  ) |>
+    purrr::set_names(tags)
+
+  # Load estimates using season and week from timestamp data
+  estimates <- purrr::imap(
+    timestamps,
+    ~ {
+      # Extract season and week from timestamp
+      season <- .x$season
+      week <- .x$week
+      week_idx <- .x$week_idx
+
+      # Build URL with season and week in filename
+      data_url <-
+        paste0(base_url, .y, "/", .y, "_", season, "_", week, ".rds")
+      data <- nflreadr::rds_from_url(data_url)
+
+      # Attach timestamp as attributes
+      attr(data, "season") <- season
+      attr(data, "week") <- week
+      attr(data, "week_idx") <- week_idx
+
+      return(data)
+    }
+  )
+
+  return(estimates)
+}
+```
+
+### Load Model Estimates
+
+Extract the latest filtered and predicted estimates from the data
+repository.
+
+``` r
+# Define both sets of tags
+filter_tags <- c(
+  "team_strength_filter",
+  "league_hfa_filter",
+  "result_filter"
+)
+
+predict_tags <- c(
+  "team_strength_predict",
+  "league_hfa_predict",
+  "result_predict"
+)
+
+# Load filter data
+filter_data <- load_estimates_data(filter_tags, base_repo_url)
+
+# Load predict data
+predict_data <- load_estimates_data(predict_tags, base_repo_url)
+```
+
+``` r
+# Clean up filter data
+filter_data <- filter_data |>
+  purrr::map(
+    \(x) {
+      x |>
+        dplyr::rename_with(
+          ~ stringr::str_remove(.x, "^filtered_")
+        ) |>
+        mutate(type = "filter")
+    }
+  )
+
+
+# Clean up predict data
+predict_data <- predict_data |>
+  purrr::map(
+    \(x) {
+      x |>
+        dplyr::rename_with(
+          ~ stringr::str_remove(.x, "^predicted_")
+        ) |>
+        mutate(type = "predict")
+    }
+  )
+```
+
+## Team Strength Rankings
+
+Current team strength estimates ranked from strongest to weakest. Values
+represent the expected point differential against an average team on a
+neutral field. The gradient intervals show the full posterior
+distribution.
+
+``` r
+# Create named vector of team colors (lightened for visibility)
+team_colors <- setNames(teams_data$team_color, teams_data$team_abbr)
+team_colors_light <- colorspace::lighten(team_colors, amount = 0.25)
+
+# Filter for the latest week
+team_strength_filter_plot <- filter_data |>
+  pluck("team_strength_filter") |>
+  left_join(teams_data, by = c("team" = "team_abbr")) |>
+  arrange(desc(E(team_strength))) |>
+  mutate(rank = row_number()) |>
+  ggplot(aes(y = reorder(team, team_strength))) +
+  # Zero reference line (average team)
+  geom_vline(
+    xintercept = 0,
+    linetype = "dashed",
+    color = "gray30",
+    linewidth = 1
+  ) +
+  # Gradient interval showing uncertainty - lightened colors for better visibility
+  stat_gradientinterval(
+    aes(xdist = team_strength, fill = team),
+    scale = 0.8,
+    show.legend = FALSE
+  ) +
+  scale_fill_manual(values = team_colors_light) +
+  # Team logos
+  geom_nfl_logos(
+    aes(x = -14, team_abbr = team),
+    width = 0.045
+  ) +
+  # Rank numbers
+  geom_text(
+    aes(x = -17, label = rank),
+    size = 5,
+    fontface = "bold",
+    color = "gray10"
+  ) +
+  # Expected value labels - positioned to the right, outside the gradient
+  geom_label(
+    aes(x = 16, label = sprintf("%.1f", E(team_strength))),
+    size = 4.5,
+    fontface = "bold",
+    label.size = 0,
+    fill = "white",
+    alpha = 0.9,
+    label.padding = unit(0.2, "lines"),
+    position = position_jitter(width = 0, height = 0.15, seed = 42)
+  ) +
+  scale_x_continuous(
+    breaks = seq(-15, 15, 5),
+    limits = c(-18, 18)
+  ) +
+  labs(
+    title = "NFL Team Strength Rankings",
+    subtitle = paste(
+      "Season",
+      attr(filter_data$team_strength_filter, "season"),
+      "- Week",
+      attr(filter_data$team_strength_filter, "week"),
+      "| Expected point differential vs average team on neutral field"
+    ),
+    x = "Team Strength (Points)",
+    y = NULL,
+    caption = "Gradient shows full posterior uncertainty | 0 = league average"
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
+    axis.text.x = element_text(size = 11),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90", linewidth = 0.3)
+  )
+
+team_strength_filter_plot
+```
+
+<img src="man/figures/README-team_strength_plot-1.png"
+data-fig-align="center" />
+
+## Home Field Advantage Comparison
+
+Team-specific home field advantages compared to league average. Values
+are typically small (within ±2 points) showing modest variation around
+the league norm.
+
+``` r
+# Extract league HFA
+league_hfa_filter <- filter_data |>
+  pluck("league_hfa_filter")
+
+# Combine team and league HFA for comparison
+team_hfa_filter <- filter_data |>
+  pluck("team_strength_filter")
+
+# Create named vector of team colors
+team_colors <- setNames(teams_data$team_color, teams_data$team_abbr)
+
+hfa_comp_plot <- team_hfa_filter |>
+  left_join(league_hfa_filter) |>
+  mutate(hfa_diff = team_hfa - league_hfa) |>
+  left_join(teams_data, by = c("team" = "team_abbr")) |>
+  arrange(desc(E(hfa_diff))) |>
+  mutate(rank = row_number()) |>
+  ggplot(aes(y = reorder(team, hfa_diff))) +
+  # Zero reference (league average)
+  geom_vline(
+    xintercept = 0,
+    linetype = "dashed",
+    color = "gray30",
+    linewidth = 1
+  ) +
+  # Uncertainty intervals - lightened team colors with dark intervals
+  stat_pointinterval(
+    aes(xdist = hfa_diff, fill = team),
+    .width = c(0.5, 0.95),
+    point_size = 2.5,
+    interval_color = "gray20",
+    color = "gray20",
+    linewidth = 1.2,
+    show.legend = FALSE
+  ) +
+  scale_fill_manual(values = team_colors_light) +
+  # Team logos
+  geom_nfl_logos(
+    aes(x = -3.5, team_abbr = team),
+    width = 0.045
+  ) +
+  # Rank numbers
+  geom_text(
+    aes(x = -4.3, label = rank),
+    size = 5,
+    fontface = "bold",
+    color = "gray10"
+  ) +
+  # Expected value labels - positioned to the right, outside the intervals
+  geom_label(
+    aes(x = 4.2, label = sprintf("%+.1f", E(hfa_diff))),
+    size = 4,
+    fontface = "bold",
+    label.size = 0,
+    fill = "white",
+    alpha = 0.9,
+    label.padding = unit(0.2, "lines"),
+    position = position_jitter(width = 0, height = 0.15, seed = 42)
+  ) +
+  scale_x_continuous(
+    breaks = seq(-4, 4, 1),
+    limits = c(-4.5, 4.5)
+  ) +
+  labs(
+    title = "Home Field Advantage Relative to League Average",
+    subtitle = paste(
+      "Season",
+      attr(filter_data$team_strength_filter, "season"),
+      "- Week",
+      attr(filter_data$team_strength_filter, "week"),
+      "| Difference from league HFA in points"
+    ),
+    x = "HFA Difference from League Average (Points)",
+    y = NULL,
+    caption = "Positive = stronger home advantage | Negative = weaker home advantage | 0 = league average"
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
+    axis.text.x = element_text(size = 11),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90", linewidth = 0.3)
+  )
+
+hfa_comp_plot
+```
+
+<img src="man/figures/README-hfa_comparison_plot-1.png"
+data-fig-align="center" />
+
+``` r
+# label: game_prediction
+
+result_predict <- predict_data |>
+  pluck("result_predict")
+# mutate(
+#   y2 = rvar_rng(rnorm, n = n(), mean = mu, sd = sigma, ndraws = 10000),
+#   y3 = mu + rvar_rng(rnorm, n = n(), mean = 0, sd = sigma),
+#   y4 = mu + rvar_rng(rnorm, n = 1, mean = 0, sd = 1) * sigma,
+#   .after = y
+# )
+
+pred_df <- inner_join(
+  result_predict,
+  game_data
+) |>
+  mutate(
+    home_mu_cover_prob = Pr(mu > spread_line),
+    home_y_cover_prob = Pr(y > spread_line),
+    away_mu_cover_prob = Pr(mu < spread_line),
+    away_y_cover_prob = Pr(y < spread_line),
+    mu_cover_prob = pmax(home_mu_cover_prob, away_mu_cover_prob),
+    y_cover_prob = pmax(home_y_cover_prob, away_y_cover_prob),
+    mu_cover_team = case_when(
+      home_mu_cover_prob > away_mu_cover_prob ~ home_team,
+      home_mu_cover_prob < away_mu_cover_prob ~ away_team,
+      TRUE ~ NA_character_
+    ),
+    y_cover_team = case_when(
+      home_y_cover_prob > away_y_cover_prob ~ home_team,
+      home_y_cover_prob < away_y_cover_prob ~ away_team,
+      TRUE ~ NA_character_
+    ),
+    mu_bet_team = ifelse(mu_cover_prob > 0.55, mu_cover_team, NA_character_),
+    y_bet_team = ifelse(y_cover_prob > 0.55, y_cover_team, NA_character_)
+  )
+```
+
+## Weekly Game Predictions
+
+Predicted outcomes for upcoming games with full uncertainty
+quantification.
+
+``` r
+# Create named vector of team colors
+team_colors <- setNames(teams_data$team_color, teams_data$team_abbr)
+team_colors2 <- setNames(teams_data$team_color2, teams_data$team_abbr)
+
+# Prepare data with better formatting
+pred_plot_df <- pred_df |>
+  mutate(
+    matchup = paste0(away_team, " @ ", home_team),
+    matchup_display = if_else(
+      hfa == 1,
+      paste0(away_team, " @ ", home_team),
+      paste0(away_team, " vs ", home_team, " (N)")
+    )
+  ) |>
+  arrange(game_idx)
+```
+
+### Expected Point Spreads vs Betting Lines
+
+How our model’s expected spread compares to Vegas betting lines. Points
+show the expected differential with uncertainty intervals.
+
+``` r
+spread_plot <- pred_plot_df |>
+  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  # Zero reference line
+  geom_vline(xintercept = 0, linetype = "solid", color = "gray60", linewidth = 0.5) +
+  # Predicted game outcome (y) - wider uncertainty including game randomness
+  stat_pointinterval(
+    aes(xdist = y),
+    .width = c(0.5, 0.95),
+    point_size = 3.5,
+    linewidth = 1.3,
+    color = "gray50",
+    alpha = 0.4
+  ) +
+  # Expected value (mu) - tighter uncertainty, parameter only
+  stat_pointinterval(
+    aes(xdist = mu),
+    .width = c(0.66, 0.95),
+    point_size = 3.5,
+    linewidth = 1.3,
+    color = "#013369"
+  ) +
+  # Betting spread line - on top so visible
+  geom_point(
+    aes(x = spread_line),
+    color = "#D50A0A",
+    size = 5.5,
+    shape = 18
+  ) +
+  # Add team logos
+  geom_nfl_logos(
+    aes(x = -32, team_abbr = away_team),
+    width = 0.04
+  ) +
+  geom_nfl_logos(
+    aes(x = 32, team_abbr = home_team),
+    width = 0.04
+  ) +
+  scale_x_continuous(
+    breaks = seq(-30, 30, 10),
+    limits = c(-35, 35)
+  ) +
+  labs(
+    title = "Model Predictions vs Betting Lines",
+    subtitle = paste(
+      "Season",
+      attr(predict_data$result_predict, "season"),
+      "- Week",
+      attr(predict_data$result_predict, "week"),
+      "| Gray: Full prediction (y) | Blue: Expected value (mu) | Red: Vegas line"
+    ),
+    x = "Point Differential (Positive = Home Team Favored)",
+    y = NULL,
+    caption = "Gray shows game prediction uncertainty | Blue shows model's best estimate | Use y (gray) for betting decisions"
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
+    axis.text.y = element_text(size = 11, face = "bold"),
+    axis.text.x = element_text(size = 11),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+spread_plot
+```
+
+<img src="man/figures/README-spread-comparison-plot-1.png"
+data-fig-align="center" />
+
+### Win Probability by Game
+
+Probability that the home team wins each matchup.
+
+``` r
+win_prob_plot <- pred_plot_df |>
+  mutate(
+    home_win_prob = Pr(y > 0),
+    away_win_prob = 1 - home_win_prob,
+    favored_team = if_else(home_win_prob > 0.5, home_team, away_team),
+    favored_color = if_else(home_win_prob > 0.5, team_colors[home_team], team_colors[away_team])
+  ) |>
+  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "gray50", linewidth = 0.8) +
+  geom_col(
+    aes(x = home_win_prob, fill = favored_team),
+    width = 0.75
+  ) +
+  geom_text(
+    aes(
+      x = home_win_prob,
+      label = scales::percent(home_win_prob, accuracy = 1)
+    ),
+    hjust = -0.2,
+    size = 4,
+    fontface = "bold"
+  ) +
+  geom_nfl_logos(
+    aes(x = 0.02, team_abbr = away_team),
+    width = 0.035
+  ) +
+  geom_nfl_logos(
+    aes(x = 0.98, team_abbr = home_team),
+    width = 0.035
+  ) +
+  scale_fill_manual(values = team_colors) +
+  scale_x_continuous(
+    labels = scales::percent,
+    limits = c(0, 1.15),
+    breaks = seq(0, 1, 0.25)
+  ) +
+  labs(
+    title = "Home Team Win Probability",
+    subtitle = paste(
+      "Season",
+      attr(predict_data$result_predict, "season"),
+      "- Week",
+      attr(predict_data$result_predict, "week")
+    ),
+    x = "Probability",
+    y = NULL
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    axis.text.y = element_text(size = 11, face = "bold"),
+    axis.text.x = element_text(size = 11),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "none"
+  )
+
+win_prob_plot
+```
+
+<img src="man/figures/README-win-prob-plot-1.png"
+data-fig-align="center" />
+
+### Predicted Score Distributions
+
+Full predictive distribution for each game showing all possible
+outcomes.
+
+``` r
+score_dist_plot <- pred_plot_df |>
+  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  geom_vline(xintercept = 0, linetype = "solid", color = "gray40", linewidth = 0.6) +
+  # Use y for full predictive distribution
+  stat_halfeye(
+    aes(xdist = y, fill = home_team),
+    .width = c(0.5, 0.95),
+    point_interval = "median_qi",
+    alpha = 0.8,
+    slab_linewidth = 0,
+    interval_color = "gray20",
+    point_color = "gray20",
+    point_size = 2.5,
+    linewidth = 1.5
+  ) +
+  geom_nfl_logos(
+    aes(x = -40, team_abbr = away_team),
+    width = 0.045
+  ) +
+  geom_nfl_logos(
+    aes(x = 40, team_abbr = home_team),
+    width = 0.045
+  ) +
+  scale_fill_manual(values = colorspace::lighten(team_colors, amount = 0.3)) +
+  scale_x_continuous(
+    breaks = seq(-40, 40, 10),
+    limits = c(-45, 45)
+  ) +
+  labs(
+    title = "Predicted Score Distributions (Game Outcomes)",
+    subtitle = paste(
+      "Season",
+      attr(predict_data$result_predict, "season"),
+      "- Week",
+      attr(predict_data$result_predict, "week"),
+      "| Full predictive distributions showing 50% and 95% credible intervals"
+    ),
+    x = "Point Differential (Positive = Home Team Wins)",
+    y = NULL,
+    caption = "Uses y (full prediction) including game randomness"
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
+    axis.text.y = element_text(size = 11, face = "bold"),
+    axis.text.x = element_text(size = 11),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "none"
+  )
+
+score_dist_plot
+```
+
+<img src="man/figures/README-score-dist-plot-1.png"
+data-fig-align="center" />
+
+### Betting Opportunities
+
+Games where our model disagrees with Vegas by at least 2 points or shows
+high confidence.
+
+``` r
+betting_plot <- pred_plot_df |>
+  mutate(
+    model_spread = E(y),  # Use y for betting decisions
+    spread_diff = model_spread - spread_line,
+    abs_diff = abs(spread_diff),
+    bet_worthy = abs_diff >= 2 | y_cover_prob >= 0.60  # Use y_cover_prob
+  ) |>
+  filter(bet_worthy) |>
+  ggplot(aes(y = reorder(matchup_display, abs_diff))) +
+  geom_vline(xintercept = 0, linetype = "solid", color = "gray50", linewidth = 0.6) +
+  # Arrow showing edge direction - draw first so it's under points
+  geom_segment(
+    aes(x = spread_line, xend = model_spread, yend = matchup_display),
+    arrow = arrow(length = unit(0.3, "cm"), type = "closed"),
+    linewidth = 1.8,
+    color = "#013369",
+    alpha = 0.7
+  ) +
+  # Vegas line - larger and on top
+  geom_point(
+    aes(x = spread_line),
+    size = 6.5,
+    color = "#D50A0A",
+    shape = 18
+  ) +
+  # Model prediction - larger and on top
+  geom_point(
+    aes(x = model_spread),
+    size = 5,
+    color = "#013369"
+  ) +
+  # Edge label
+  geom_text(
+    aes(
+      x = (spread_line + model_spread) / 2,
+      label = sprintf("%.1f pts", abs(spread_diff))
+    ),
+    vjust = -0.9,
+    size = 4.5,
+    fontface = "bold",
+    color = "gray20"
+  ) +
+  # Cover probability label
+  geom_text(
+    aes(
+      x = (spread_line + model_spread) / 2,
+      label = sprintf("%d%%", round(y_cover_prob * 100))
+    ),
+    vjust = 1.8,
+    size = 3.5,
+    fontface = "bold",
+    color = "#013369"
+  ) +
+  geom_nfl_logos(
+    aes(x = min(c(spread_line, model_spread)) - 5, team_abbr = away_team),
+    width = 0.045
+  ) +
+  geom_nfl_logos(
+    aes(x = max(c(spread_line, model_spread)) + 5, team_abbr = home_team),
+    width = 0.045
+  ) +
+  labs(
+    title = "Betting Edges Over Vegas Lines",
+    subtitle = paste(
+      "Season",
+      attr(predict_data$result_predict, "season"),
+      "- Week",
+      attr(predict_data$result_predict, "week"),
+      "| Games with 2+ point disagreement or 60%+ cover probability",
+      "\nRed = Vegas | Blue = Model (y) | Percentages show cover probability"
+    ),
+    x = "Point Spread (Positive = Home Team Favored)",
+    y = NULL,
+    caption = "Uses y (full prediction) for realistic betting expectations"
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(size = 11),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+betting_plot
+```
+
+<img src="man/figures/README-betting-edge-plot-1.png"
+data-fig-align="center" />
+
+------------------------------------------------------------------------
+
+*This README is automatically updated via GitHub Actions each week with
+the latest predictions and team strength estimates.*

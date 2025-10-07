@@ -1,19 +1,38 @@
 ---
-title: "Weekly Report"
-vignette: >
-  %\VignetteIndexEntry{Weekly Report}
-  %\VignetteEngine{quarto::html}
-  %\VignetteEncoding{UTF-8}
+format: gfm
 knitr:
   opts_chunk:
     collapse: true
     comment: '#>'
     message: false
     warning: false
+    fig.path: "man/figures/README-"
 ---
 
-This report provides weekly updates on NFL team strength estimates, home field
-advantage, and game predictions using Bayesian state-space models.
+<!-- README.md is generated from README.qmd. Please edit that file -->
+
+# nflendzonePipeline
+
+<!-- badges: start -->
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+<!-- badges: end -->
+
+**Automated NFL game predictions and team strength estimates using Bayesian state-space models.**
+
+This package provides an automated pipeline for NFL analytics, with weekly updates powered by GitHub Actions. The visualizations below are automatically updated each week with the latest predictions and team rankings.
+
+## Installation
+
+You can install the development version of nflendzonePipeline from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("pak")
+pak::pak("TylerPollard410/nflendzonePipeline")
+```
+
+## Weekly Report
+
+This report provides weekly updates on NFL team strength estimates, home field advantage, and game predictions using Bayesian state-space models.
 
 ```{r}
 #| label: libraries
@@ -34,7 +53,7 @@ library(nflendzonePipeline)
 theme_set(theme_ggdist())
 ```
 
-## Data Setup
+### Data Setup
 
 Load game data and team information from all available seasons.
 
@@ -95,7 +114,7 @@ load_estimates_data <- function(tags, base_url) {
 }
 ```
 
-## Load Model Estimates
+### Load Model Estimates
 
 Extract the latest filtered and predicted estimates from the data repository.
 
@@ -722,3 +741,7 @@ betting_plot <- pred_plot_df |>
 
 betting_plot
 ```
+
+---
+
+*This README is automatically updated via GitHub Actions each week with the latest predictions and team strength estimates.*
