@@ -31,6 +31,8 @@ usethis::use_package("stringr")
 
 # ---- Folders ----
 
-usethis::use_directory("data-raw")   # For ETL scripts
+usethis::use_directory("data-raw") # For ETL scripts
 usethis::use_directory("artifacts/data-archive")
 
+# ---- Vingettes ----
+usethis::use_vignette("weekly-report.qmd", title = "Weekly Report")

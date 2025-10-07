@@ -554,13 +554,6 @@ cat("\n=== Upload Model Objects ===\n")
 
 ### Team Strength Fit ----
 fit_tag <- "team_strength_fit"
-fit_files <- fit$save_output_files(
-  dir = "artifacts/model-archive/team_strength",
-  basename = fit_tag,
-  timestamp = FALSE,
-  random = FALSE
-)
-
 fit_timestamp <- c(
   season = filter_season,
   week = filter_week,
@@ -577,13 +570,6 @@ upload_cmdstan_outputs(
 
 ### Team Strength GQ ----
 gq_tag <- "team_strength_gq"
-gq_files <- gq$save_output_files(
-  dir = tempdir(),
-  basename = gq_tag,
-  timestamp = FALSE,
-  random = FALSE
-)
-
 predict_timestamp <- c(
   season = predict_season,
   week = predict_week,
