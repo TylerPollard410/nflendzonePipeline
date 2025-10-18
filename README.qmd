@@ -1,5 +1,8 @@
 ---
-format: gfm
+format: 
+  gfm:
+    toc: true
+    toc-depth: 3
 knitr:
   opts_chunk:
     collapse: true
@@ -30,7 +33,7 @@ You can install the development version of nflendzonePipeline from [GitHub](http
 pak::pak("TylerPollard410/nflendzonePipeline")
 ```
 
-## Weekly Report
+# Weekly Report
 
 This report provides weekly updates on NFL team strength estimates, home field advantage, and game predictions using Bayesian state-space models.
 
@@ -53,12 +56,14 @@ library(nflendzonePipeline)
 theme_set(theme_ggdist())
 ```
 
-### Data Setup
+## Data Setup
 
 Load game data and team information from all available seasons.
 
 ```{r}
 #| label: globals
+#| code-fold: true
+#| code-summary: "Show the R code - globals"
 
 all_seasons <- 2002:nflreadr::most_recent_season()
 teams_data <- nflreadr::load_teams(current = TRUE)
@@ -71,8 +76,14 @@ base_repo_url <-
   "https://github.com/TylerPollard410/nflendzoneData/releases/download/"
 ```
 
+## Load Model Estimates
+
+Extract the latest filtered and predicted estimates from the data repository.
+
 ```{r}
-#| label: load_estimates_data function
+#| label: load-estimates-data-function
+#| code-fold: true
+#| code-summary: "Show the R code - load-estimates-data-function"
 
 # Function to load timestamps and estimates for a given set of tags
 load_estimates_data <- function(tags, base_url) {
@@ -114,12 +125,10 @@ load_estimates_data <- function(tags, base_url) {
 }
 ```
 
-### Load Model Estimates
-
-Extract the latest filtered and predicted estimates from the data repository.
-
 ```{r}
-#| label: extract estimates
+#| label: extract-estimates
+#| code-fold: true
+#| code-summary: "Show the R code - extract-estimates"
 
 # Define both sets of tags
 filter_tags <- c(
@@ -142,7 +151,9 @@ predict_data <- load_estimates_data(predict_tags, base_repo_url)
 ```
 
 ```{r}
-#| label: clean up data
+#| label: clean-data
+#| code-fold: true
+#| code-summary: "Show the R code - clean-data"
 
 # Clean up filter data
 filter_data <- filter_data |>
@@ -177,7 +188,9 @@ represent the expected point differential against an average team on a neutral
 field. The gradient intervals show the full posterior distribution.
 
 ```{r}
-#| label: team_strength_plot
+#| label: team-strength-plot
+#| code-fold: true
+#| code-summary: "Show the R code - team-strength-plot"
 #| fig-align: center
 #| fig-width: 10
 #| fig-height: 14
@@ -268,7 +281,9 @@ Team-specific home field advantages compared to league average. Values are
 typically small (within ±2 points) showing modest variation around the league norm.
 
 ```{r}
-#| label: hfa_comparison_plot
+#| label: hfa-comparison-plot
+#| code-fold: true
+#| code-summary: "Show the R code - hfa-comparison-plot"
 #| fig-align: center
 #| fig-width: 10
 #| fig-height: 14
@@ -364,8 +379,14 @@ hfa_comp_plot <- team_hfa_filter |>
 hfa_comp_plot
 ```
 
+## Weekly Game Predictions
+
+Predicted outcomes for upcoming games with full uncertainty quantification.
+
 ```{r}
-# label: game_prediction
+#| label: game-prediction
+#| code-fold: true
+#| code-summary: "Show the R code - game-prediction"
 
 result_predict <- predict_data |>
   pluck("result_predict")
@@ -402,13 +423,10 @@ pred_df <- inner_join(
   )
 ```
 
-
-## Weekly Game Predictions
-
-Predicted outcomes for upcoming games with full uncertainty quantification.
-
 ```{r}
 #| label: prep-prediction-data
+#| code-fold: true
+#| code-summary: "Show the R code - prep-prediction-data"
 
 # Create named vector of team colors
 team_colors <- setNames(teams_data$team_color, teams_data$team_abbr)
@@ -434,6 +452,8 @@ expected differential with uncertainty intervals.
 
 ```{r}
 #| label: spread-comparison-plot
+#| code-fold: true
+#| code-summary: "Show the R code - spread-comparison-plot"
 #| fig-align: center
 #| fig-width: 11
 #| fig-height: 8
@@ -512,6 +532,8 @@ Probability that the home team wins each matchup.
 
 ```{r}
 #| label: win-prob-plot
+#| code-fold: true
+#| code-summary: "Show the R code - win-prob-plot"
 #| fig-align: center
 #| fig-width: 11
 #| fig-height: 8
@@ -583,6 +605,8 @@ Full predictive distribution for each game showing all possible outcomes.
 
 ```{r}
 #| label: score-dist-plot
+#| code-fold: true
+#| code-summary: "Show the R code - score-dist-plot"
 #| fig-align: center
 #| fig-width: 11
 #| fig-height: 9
@@ -649,6 +673,8 @@ Games where our model disagrees with Vegas by at least 2 points or shows high co
 
 ```{r}
 #| label: betting-edge-plot
+#| code-fold: true
+#| code-summary: "Show the R code - betting-edge-plot"
 #| fig-align: center
 #| fig-width: 11
 #| fig-height: 7
