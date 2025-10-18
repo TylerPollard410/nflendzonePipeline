@@ -1,5 +1,19 @@
 
 
+- [nflendzonePipeline](#nflendzonepipeline)
+  - [Installation](#installation)
+- [Weekly Report](#weekly-report)
+  - [Data Setup](#data-setup)
+  - [Load Model Estimates](#load-model-estimates)
+  - [Team Strength Rankings](#team-strength-rankings)
+  - [Home Field Advantage Comparison](#home-field-advantage-comparison)
+  - [Weekly Game Predictions](#weekly-game-predictions)
+    - [Expected Point Spreads vs Betting
+      Lines](#expected-point-spreads-vs-betting-lines)
+    - [Win Probability by Game](#win-probability-by-game)
+    - [Predicted Score Distributions](#predicted-score-distributions)
+    - [Betting Opportunities](#betting-opportunities)
+
 <!-- README.md is generated from README.qmd. Please edit that file -->
 
 # nflendzonePipeline
@@ -28,7 +42,7 @@ You can install the development version of nflendzonePipeline from
 pak::pak("TylerPollard410/nflendzonePipeline")
 ```
 
-## Weekly Report
+# Weekly Report
 
 This report provides weekly updates on NFL team strength estimates, home
 field advantage, and game predictions using Bayesian state-space models.
@@ -50,9 +64,12 @@ library(nflendzonePipeline)
 theme_set(theme_ggdist())
 ```
 
-### Data Setup
+## Data Setup
 
 Load game data and team information from all available seasons.
+
+<details class="code-fold">
+<summary>Show the R code - globals</summary>
 
 ``` r
 all_seasons <- 2002:nflreadr::most_recent_season()
@@ -65,6 +82,16 @@ season_weeks_df <- game_data |>
 base_repo_url <-
   "https://github.com/TylerPollard410/nflendzoneData/releases/download/"
 ```
+
+</details>
+
+## Load Model Estimates
+
+Extract the latest filtered and predicted estimates from the data
+repository.
+
+<details class="code-fold">
+<summary>Show the R code - load-estimates-data-function</summary>
 
 ``` r
 # Function to load timestamps and estimates for a given set of tags
@@ -107,10 +134,10 @@ load_estimates_data <- function(tags, base_url) {
 }
 ```
 
-### Load Model Estimates
+</details>
 
-Extract the latest filtered and predicted estimates from the data
-repository.
+<details class="code-fold">
+<summary>Show the R code - extract-estimates</summary>
 
 ``` r
 # Define both sets of tags
@@ -132,6 +159,11 @@ filter_data <- load_estimates_data(filter_tags, base_repo_url)
 # Load predict data
 predict_data <- load_estimates_data(predict_tags, base_repo_url)
 ```
+
+</details>
+
+<details class="code-fold">
+<summary>Show the R code - clean-data</summary>
 
 ``` r
 # Clean up filter data
@@ -160,12 +192,17 @@ predict_data <- predict_data |>
   )
 ```
 
+</details>
+
 ## Team Strength Rankings
 
 Current team strength estimates ranked from strongest to weakest. Values
 represent the expected point differential against an average team on a
 neutral field. The gradient intervals show the full posterior
 distribution.
+
+<details class="code-fold">
+<summary>Show the R code - team-strength-plot</summary>
 
 ``` r
 # Create named vector of team colors (lightened for visibility)
@@ -248,7 +285,9 @@ team_strength_filter_plot <- filter_data |>
 team_strength_filter_plot
 ```
 
-<img src="man/figures/README-team_strength_plot-1.png"
+</details>
+
+<img src="man/figures/README-team-strength-plot-1.png"
 data-fig-align="center" />
 
 ## Home Field Advantage Comparison
@@ -256,6 +295,9 @@ data-fig-align="center" />
 Team-specific home field advantages compared to league average. Values
 are typically small (within ±2 points) showing modest variation around
 the league norm.
+
+<details class="code-fold">
+<summary>Show the R code - hfa-comparison-plot</summary>
 
 ``` r
 # Extract league HFA
@@ -349,12 +391,20 @@ hfa_comp_plot <- team_hfa_filter |>
 hfa_comp_plot
 ```
 
-<img src="man/figures/README-hfa_comparison_plot-1.png"
+</details>
+
+<img src="man/figures/README-hfa-comparison-plot-1.png"
 data-fig-align="center" />
 
-``` r
-# label: game_prediction
+## Weekly Game Predictions
 
+Predicted outcomes for upcoming games with full uncertainty
+quantification.
+
+<details class="code-fold">
+<summary>Show the R code - game-prediction</summary>
+
+``` r
 result_predict <- predict_data |>
   pluck("result_predict")
 # mutate(
@@ -390,10 +440,10 @@ pred_df <- inner_join(
   )
 ```
 
-## Weekly Game Predictions
+</details>
 
-Predicted outcomes for upcoming games with full uncertainty
-quantification.
+<details class="code-fold">
+<summary>Show the R code - prep-prediction-data</summary>
 
 ``` r
 # Create named vector of team colors
@@ -413,10 +463,15 @@ pred_plot_df <- pred_df |>
   arrange(game_idx)
 ```
 
+</details>
+
 ### Expected Point Spreads vs Betting Lines
 
 How our model’s expected spread compares to Vegas betting lines. Points
 show the expected differential with uncertainty intervals.
+
+<details class="code-fold">
+<summary>Show the R code - spread-comparison-plot</summary>
 
 ``` r
 spread_plot <- pred_plot_df |>
@@ -487,12 +542,17 @@ spread_plot <- pred_plot_df |>
 spread_plot
 ```
 
+</details>
+
 <img src="man/figures/README-spread-comparison-plot-1.png"
 data-fig-align="center" />
 
 ### Win Probability by Game
 
 Probability that the home team wins each matchup.
+
+<details class="code-fold">
+<summary>Show the R code - win-prob-plot</summary>
 
 ``` r
 win_prob_plot <- pred_plot_df |>
@@ -556,6 +616,8 @@ win_prob_plot <- pred_plot_df |>
 win_prob_plot
 ```
 
+</details>
+
 <img src="man/figures/README-win-prob-plot-1.png"
 data-fig-align="center" />
 
@@ -563,6 +625,9 @@ data-fig-align="center" />
 
 Full predictive distribution for each game showing all possible
 outcomes.
+
+<details class="code-fold">
+<summary>Show the R code - score-dist-plot</summary>
 
 ``` r
 score_dist_plot <- pred_plot_df |>
@@ -621,6 +686,8 @@ score_dist_plot <- pred_plot_df |>
 score_dist_plot
 ```
 
+</details>
+
 <img src="man/figures/README-score-dist-plot-1.png"
 data-fig-align="center" />
 
@@ -628,6 +695,9 @@ data-fig-align="center" />
 
 Games where our model disagrees with Vegas by at least 2 points or shows
 high confidence.
+
+<details class="code-fold">
+<summary>Show the R code - betting-edge-plot</summary>
 
 ``` r
 betting_plot <- pred_plot_df |>
@@ -718,6 +788,8 @@ betting_plot <- pred_plot_df |>
 
 betting_plot
 ```
+
+</details>
 
 <img src="man/figures/README-betting-edge-plot-1.png"
 data-fig-align="center" />
