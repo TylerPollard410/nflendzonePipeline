@@ -98,7 +98,15 @@ save_and_upload <- function(
         file.path(archive_dir, "timestamp.json")
       )
       purrr::walk(pb_files, \(f) {
-        if (file.exists(f)) piggyback::pb_upload(f, repo = repo, tag = tag)
+        if (!file.exists(f)) {
+          return(invisible(NULL))
+        }
+        tryCatch({
+          piggyback::pb_upload(f, repo = repo, tag = tag, overwrite = TRUE)
+          cli::cli_alert_success("Uploaded {basename(f)} for tag {tag}")
+        }, error = function(e) {
+          cli::cli_warn("Upload failed for {basename(f)}: {conditionMessage(e)}; continuing")
+        })
       })
     })
     # Per-season files (leave as-is unless you want archive_formats control here too)
@@ -114,17 +122,44 @@ save_and_upload <- function(
       })
       list(parquet = pq_path, rds = rds_path, csv = csv_path)
     })
+    # Robust per-season upload with per-file checks and error handling
     purrr::walk(season_files, \(filelist) {
-      suppressWarnings({
-        piggyback::pb_upload(filelist$parquet, repo = repo, tag = tag)
-        piggyback::pb_upload(filelist$rds, repo = repo, tag = tag)
-        piggyback::pb_upload(filelist$csv, repo = repo, tag = tag)
+      purrr::walk(filelist, function(path) {
+        if (is.null(path) || !nzchar(path) || !file.exists(path)) {
+          cli::cli_warn("Skipping missing file: {path}")
+          return(invisible(NULL))
+        }
+
+        tryCatch({
+          piggyback::pb_upload(path, repo = repo, tag = tag, overwrite = TRUE)
+          cli::cli_alert_success("Uploaded {basename(path)} for tag {tag}")
+        }, error = function(e) {
+          cli::cli_warn("Upload failed for {basename(path)}: {conditionMessage(e)}; continuing")
+        })
       })
-      unlink(c(filelist$parquet, filelist$rds, filelist$csv))
+
+      # Best-effort cleanup; don't abort on cleanup failure
+      tryCatch({
+        unlink(c(filelist$parquet, filelist$rds, filelist$csv))
+      }, error = function(e) {
+        cli::cli_warn("Cleanup failed for season files: {conditionMessage(e)}")
+      })
     })
     gc()
   }
   invisible(TRUE)
+}
+
+
+#' Safe wrapper for save_and_upload that logs errors rather than aborting
+safe_save_and_upload <- function(...) {
+  tryCatch({
+    save_and_upload(...)
+    TRUE
+  }, error = function(e) {
+    cli::cli_warn("save_and_upload failed: {conditionMessage(e)}")
+    FALSE
+  })
 }
 
 

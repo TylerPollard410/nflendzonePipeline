@@ -28,6 +28,19 @@ library(nflfastR)
 library(nflseedR)
 library(nflendzonePipeline)
 
+# DEBUG: Print session and selected package versions for CI diagnostic
+message("[DEBUG] sessionInfo():")
+print(sessionInfo())
+
+pkgs <- c("purrr", "rlang", "cli", "piggyback", "nflfastR", "nflreadr", "utf8", "fs", "openssl")
+installed <- utils::installed.packages()
+installed_sel <- NULL
+if (nrow(installed) > 0) {
+  installed_sel <- installed[rownames(installed) %in% pkgs, c("Package", "Version"), drop = FALSE]
+}
+message("[DEBUG] selected installed packages:")
+print(installed_sel)
+
 # ============================================================================ #
 # 2. LOAD PIPELINE FUNCTIONS ----
 # ============================================================================ #
@@ -196,7 +209,7 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -265,7 +278,7 @@ if (full_build || is.null(prior_data)) {
 }
 
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -352,7 +365,7 @@ if (full_build || is.null(prior_data)) {
 #
 # if (rebuild_cond1 || rebuild_cond2) {
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -423,7 +436,7 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -501,7 +514,7 @@ if (
   }
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -557,7 +570,7 @@ if (full_build || is.null(prior_data)) {
   }
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -617,7 +630,7 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -693,7 +706,7 @@ if (full_build || is.null(prior_data)) {
   }
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -745,7 +758,7 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -801,7 +814,7 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -853,7 +866,7 @@ if (full_build || is.null(prior_data)) {
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -892,7 +905,7 @@ if (
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -929,7 +942,7 @@ if (
   full_data <- prior_data
 }
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -957,7 +970,7 @@ full_data <- compute_team_features_data(
   features = c("elo", "srs", "epa", "scores", "series", "redzone", "turnover")
 )
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -985,7 +998,7 @@ full_data <- compute_game_features_data(
   team_features_data = team_features_df
 )
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -1011,7 +1024,7 @@ full_data <- compute_team_model_data(
   feats_roll_window = 5
 )
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
@@ -1079,7 +1092,7 @@ full_data <- compute_game_model_data(
   )
 )
 
-save_and_upload(
+safe_save_and_upload(
   tag = tag,
   full_data = full_data,
   #seasons     = all_seasons,
