@@ -80,35 +80,23 @@ needed_tags <- c(
 # ============================================================================ #
 # 4. RELEASE TAGS EXIST IN GITHUB DATA REPO ----
 # ============================================================================ #
-for (tag_name in needed_tags) {
-  tryCatch(
-    {
-      piggyback::pb_release_create(
-        repo = github_data_repo,
-        tag = tag_name,
-        name = tag_name,
-        body = paste("Data release for", tag_name)
-      )
-    },
-    error = function(e) {
-      # Release already exists or other error - this is fine
-      # Only log if it's not the "already exists" message
-      if (
-        !grepl(
-          "already exists|Validation Failed",
-          conditionMessage(e),
-          ignore.case = TRUE
-        )
-      ) {
-        cat(sprintf(
-          "Note: Could not create release '%s': %s\n",
-          tag_name,
-          conditionMessage(e)
-        ))
-      }
-    }
-  )
+current_releases <- pb_releases(repo = github_data_repo)
+existing_tags <- current_releases$release_name
+needed_tags <- setdiff(needed_tags, existing_tags)
+
+if (length(needed_tags) > 0) {
+  for (tag_name in needed_tags) {
+  piggyback::pb_release_create(
+    repo = github_data_repo,
+    tag = tag_name,
+    name = tag_name,
+    body = paste("Data release for", tag_name)
+  )}
+} else {
+  cat("All needed releases already exist in GitHub repo.\n")
 }
+
+
 
 # ============================================================================ #
 # 5. DATA GENERATION ----
@@ -147,12 +135,12 @@ pbp_data <- compute_pbp_data(seasons = all_seasons)
 
 # ---------------------------------------------------------------------------- #
 #### player_offense_data ----
-cat("%%%% Generating player_offense_data %%%%\n")
-player_offense_data <- compute_player_data(
-  seasons = all_seasons,
-  game_long_df = game_data_long,
-  stat = "offense"
-)
+# cat("%%%% Generating player_offense_data %%%%\n")
+# player_offense_data <- compute_player_data(
+#   seasons = all_seasons,
+#   game_long_df = game_data_long,
+#   stat = "offense"
+# )
 
 
 # ---------------------------------------------------------------------------- #
