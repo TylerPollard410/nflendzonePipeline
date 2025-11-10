@@ -6,6 +6,7 @@
 artifacts/model-archive/
 inst/doc
 **/.quarto/
+.vscode/
 
 /.quarto/
 **/*.quarto_ipynb
