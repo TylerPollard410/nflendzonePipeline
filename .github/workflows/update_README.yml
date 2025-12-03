@@ -23,10 +23,7 @@ jobs:
       - name: Install system dependencies (minimal for README)
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            # build-essential \   # optional: needed for Stan/C++ builds
-            # cmake \             # optional: needed for Stan/C++ builds
-            # gfortran \          # optional: needed for Stan/C++ builds
+          sudo apt-get install -y --no-install-recommends \
             libcurl4-openssl-dev \
             libssl-dev \
             libxml2-dev \
@@ -37,6 +34,15 @@ jobs:
             libpng-dev \
             libtiff5-dev \
             libjpeg-dev
+
+      # Optional: Stan/C++ toolchain (uncomment this whole step when needed)
+      # - name: Install build toolchain for Stan (optional)
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y --no-install-recommends \
+      #       build-essential \
+      #       cmake \
+      #       gfortran
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
