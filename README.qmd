@@ -40,13 +40,27 @@ This report provides weekly updates on NFL team strength estimates, home field a
 ```{r}
 #| label: libraries
 
-library(tidyverse)
-library(posterior)
-library(distributional)
-library(tidybayes)
+# Core data manipulation
+library(dplyr)
+library(purrr)
+library(stringr)
+# library(readr)      # optional: file I/O helpers (not used here)
+# library(lubridate)  # optional: date/time tools (not used here)
+
+# Plotting and colors
+library(ggplot2)
 library(ggdist)
-library(bayesplot)
-library(patchwork)
+library(colorspace)
+library(grid) # for unit()
+# library(bayesplot)   # optional: Bayesian plotting helpers (not used here)
+# library(patchwork)   # optional: plot composition (not used here)
+
+# Bayesian random variables and helpers (E, Pr, rvar)
+library(posterior)
+# library(distributional)  # optional: distributions/rvars (not called directly)
+# library(tidybayes)       # optional: tidy extraction of Bayesian fits (not used here)
+
+# NFL packages (keep these five at the end)
 library(nflreadr)
 library(nflplotR)
 library(nflendzone)
@@ -461,7 +475,12 @@ expected differential with uncertainty intervals.
 spread_plot <- pred_plot_df |>
   ggplot(aes(y = reorder(matchup_display, game_idx))) +
   # Zero reference line
-  geom_vline(xintercept = 0, linetype = "solid", color = "gray60", linewidth = 0.5) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "solid",
+    color = "gray60",
+    linewidth = 0.5
+  ) +
   # Predicted game outcome (y) - wider uncertainty including game randomness
   stat_pointinterval(
     aes(xdist = y),
@@ -543,10 +562,19 @@ win_prob_plot <- pred_plot_df |>
     home_win_prob = Pr(y > 0),
     away_win_prob = 1 - home_win_prob,
     favored_team = if_else(home_win_prob > 0.5, home_team, away_team),
-    favored_color = if_else(home_win_prob > 0.5, team_colors[home_team], team_colors[away_team])
+    favored_color = if_else(
+      home_win_prob > 0.5,
+      team_colors[home_team],
+      team_colors[away_team]
+    )
   ) |>
   ggplot(aes(y = reorder(matchup_display, game_idx))) +
-  geom_vline(xintercept = 0.5, linetype = "dashed", color = "gray50", linewidth = 0.8) +
+  geom_vline(
+    xintercept = 0.5,
+    linetype = "dashed",
+    color = "gray50",
+    linewidth = 0.8
+  ) +
   geom_col(
     aes(x = home_win_prob, fill = favored_team),
     width = 0.75
@@ -613,7 +641,12 @@ Full predictive distribution for each game showing all possible outcomes.
 
 score_dist_plot <- pred_plot_df |>
   ggplot(aes(y = reorder(matchup_display, game_idx))) +
-  geom_vline(xintercept = 0, linetype = "solid", color = "gray40", linewidth = 0.6) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "solid",
+    color = "gray40",
+    linewidth = 0.6
+  ) +
   # Use y for full predictive distribution
   stat_halfeye(
     aes(xdist = y, fill = home_team),
@@ -681,14 +714,19 @@ Games where our model disagrees with Vegas by at least 2 points or shows high co
 
 betting_plot <- pred_plot_df |>
   mutate(
-    model_spread = E(y),  # Use y for betting decisions
+    model_spread = E(y), # Use y for betting decisions
     spread_diff = model_spread - spread_line,
     abs_diff = abs(spread_diff),
-    bet_worthy = abs_diff >= 2 | y_cover_prob >= 0.60  # Use y_cover_prob
+    bet_worthy = abs_diff >= 2 | y_cover_prob >= 0.60 # Use y_cover_prob
   ) |>
   filter(bet_worthy) |>
   ggplot(aes(y = reorder(matchup_display, abs_diff))) +
-  geom_vline(xintercept = 0, linetype = "solid", color = "gray50", linewidth = 0.6) +
+  geom_vline(
+    xintercept = 0,
+    linetype = "solid",
+    color = "gray50",
+    linewidth = 0.6
+  ) +
   # Arrow showing edge direction - draw first so it's under points
   geom_segment(
     aes(x = spread_line, xend = model_spread, yend = matchup_display),
