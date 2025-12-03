@@ -2,7 +2,7 @@ name: Update README
 
 on:
   schedule:
-    # 8:00 UTC every Tuesday during football season (Sep-Dec, Jan-Feb)
+    # 10:00 UTC every Tuesday during football season (Sep–Dec, Jan–Feb)
     - cron: '0 10 * 9,10,11,12 2'
     - cron: '0 10 * 1,2 2'
   workflow_dispatch:
@@ -19,8 +19,7 @@ jobs:
         with:
           token: ${{ secrets.PUSH_TOKEN }}
 
-      # System dependencies required for README rendering (fonts/images/network/XML)
-      - name: Install system dependencies (minimal for README)
+      - name: Install system dependencies (README + package deps)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -33,16 +32,13 @@ jobs:
             libfreetype6-dev \
             libpng-dev \
             libtiff5-dev \
-            libjpeg-dev
-
-      # Optional: Stan/C++ toolchain (uncomment this whole step when needed)
-      # - name: Install build toolchain for Stan (optional)
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y --no-install-recommends \
-      #       build-essential \
-      #       cmake \
-      #       gfortran
+            libjpeg-dev \
+            libmagick++-dev
+          # Toolchain needed for source builds like arrow (keep gfortran optional)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake
+          # sudo apt-get install -y --no-install-recommends gfortran  # optional
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
@@ -50,7 +46,6 @@ jobs:
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
-      # Install R packages with inline comments; uncomment as needed
       - name: Install R packages (dependencies)
         run: |
           Rscript - <<'RSCRIPT'
@@ -59,45 +54,44 @@ jobs:
             "dplyr",
             "purrr",
             "stringr",
-            # "readr",      # optional: file I/O helpers
-            # "lubridate",  # optional: date/time tools
+            # "readr",      # optional
+            # "lubridate",  # optional
 
             # Plotting and colors
             "ggplot2",
             "ggdist",
             "colorspace",
-            # "bayesplot",  # optional: Bayesian plotting helpers
-            # "patchwork",  # optional: plot composition
+            # "bayesplot",  # optional
+            # "patchwork",  # optional
 
-            # Bayesian random variables and helpers
+            # Bayesian random variables
             "posterior",
-            # "distributional", # optional: distributions/rvars
-            # "tidybayes",      # optional: tidy extraction of Bayesian fits
+            # "distributional", # optional
+            # "tidybayes",      # optional
 
             # NFL packages and related
             "nflreadr",
             "nflplotR",
-            # "nflfastR",  # optional: play-by-play data
-            # "nflseedR",  # optional: seeding utilities
 
-            # Utilities used via :: (keep for dependency resolution)
-            "jsonlite",
-            "remotes"
+            # Dependencies package pulls in
+            "arrow",
+            "future",
+            "progressr",
+            "readr",
+            "slider",
+            "nflfastR",
+            "nflseedR",
+
+            # Image handling used by nflplotR
+            "magick",
+            "ggpath",
+
+            # Utilities
+            "jsonlite","remotes"
           ), repos = "https://cloud.r-project.org")
           RSCRIPT
 
-      # Optional: cmdstanr for Stan builds (commented out for README-only)
-      # - name: Install cmdstanr (optional)
-      #   run: |
-      #     Rscript -e 'install.packages("cmdstanr", repos = c("https://stan-dev.r-universe.dev", getOption("repos")))'
-
-      # Optional: install CmdStan (commented out for README-only)
-      # - name: Install CmdStan (optional)
-      #   run: |
-      #     Rscript -e 'cmdstanr::check_cmdstan_toolchain(fix = TRUE, quiet = TRUE)'
-      #     Rscript -e 'cmdstanr::install_cmdstan(cores = parallel::detectCores(), quiet = TRUE)'
-
-      - name: Install Stan model packages
+      - name: Install GitHub packages
         run: |
           Rscript -e 'remotes::install_github(c(
             "TylerPollard410/nflendzoneModel",
@@ -105,11 +99,9 @@ jobs:
           ))'
           Rscript -e 'install.packages(".", repos = NULL, type = "source")'
 
-      # Optional: run the full model pipeline (commented out for README-only)
-      # - name: Run team strength model pipeline (optional)
-      #   run: |
-      #     mkdir -p artifacts/model-archive/team_strength
-      #     Rscript data-raw/update_team_strength_model.R
+      - name: Verify required packages
+        run: |
+          Rscript -e 'pkgs <- c("dplyr","purrr","stringr","ggplot2","ggdist","colorspace","posterior","nflreadr","nflplotR","magick","ggpath","arrow","jsonlite"); missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if(length(missing)) stop("Missing packages: ", paste(missing, collapse=", "))'
 
       - name: Render README
         run: |
@@ -119,6 +111,6 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add README.md man/figures/
+          git add README.qmd README.md man/figures/
           git commit -m "Render README [skip ci] $(TZ='America/New_York' date '+%Y-%m-%d %H:%M %Z')" || echo "No changes to commit"
           git push origin HEAD
