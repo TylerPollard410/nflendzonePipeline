@@ -12748,3 +12748,5 @@ game_id,season,week,team,opponent,location,turnover_diff,turnovers_won,turnovers
 2025_13_DEN_WAS,2025,13,DEN,WAS,away,0,1,1,1,0,1,0
 2025_13_NYG_NE,2025,13,NE,NYG,home,0,0,0,0,0,0,0
 2025_13_NYG_NE,2025,13,NYG,NE,away,0,0,0,0,0,0,0
+2025_14_DAL_DET,2025,14,DET,DAL,home,3,3,0,2,1,0,0
+2025_14_DAL_DET,2025,14,DAL,DET,away,-3,0,3,0,0,2,1
