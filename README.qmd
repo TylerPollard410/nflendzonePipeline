@@ -878,6 +878,165 @@ score_dist_plot <- pred_plot_df |>
 score_dist_plot
 ```
 
+```{r}
+#| label: score-dist-plot-new
+#| code-fold: true
+#| code-summary: "Show the R code - score-dist-plot"
+#| fig-align: center
+#| fig-width: 11
+#| fig-height: 9
+
+min_y_pred <- quantile(
+  pred_plot_df$y,
+  probs = 0
+) |>
+  min()
+max_y_pred <- quantile(
+  pred_plot_df$y,
+  probs = 1
+) |>
+  max()
+
+pred_plot_df2 <- pred_plot_df |>
+  tidybayes::unnest_rvars() |>
+  tidybayes::sample_draws(ndraws = 4000, seed = 52)
+
+# Create data subsets for two-toned slabs with smooth density
+pred_plot_df_away <- pred_plot_df2 |>
+  filter(y < spread_line)
+
+pred_plot_df_home <- pred_plot_df2 |>
+  filter(y >= spread_line)
+
+score_dist_plot_new <- pred_plot_df |>
+  mutate(
+    spread_line_y_prob = density(y, spread_line)
+  ) |>
+  ggplot(
+    aes(
+      y = reorder(matchup_display, game_idx, decreasing = TRUE)
+    )
+  ) +
+  # Zero reference (home win threshold)
+  geom_vline(
+    xintercept = 0,
+    linetype = "solid",
+    color = "gray40",
+    linewidth = 0.6
+  ) +
+  # Two-toned slab: away color below spread, home color above spread
+  stat_slab(
+    data = pred_plot_df_away,
+    aes(
+      x = y,
+      y = reorder(matchup_display, game_idx, decreasing = TRUE),
+      fill = away_team
+    ),
+    adjust = 1.5,
+    alpha = 0.85,
+    slab_linewidth = 0,
+    normalize = "groups",
+    show.legend = FALSE
+  ) +
+  stat_slab(
+    data = pred_plot_df_home,
+    aes(
+      x = y,
+      y = reorder(matchup_display, game_idx, decreasing = TRUE),
+      fill = home_team
+    ),
+    adjust = 1.5,
+    alpha = 0.85,
+    slab_linewidth = 0,
+    normalize = "groups",
+    show.legend = FALSE
+  ) +
+  # Point interval on top
+  stat_pointinterval(
+    aes(xdist = y),
+    point_interval = "median_qi",
+    .width = c(0.5, 0.95),
+    interval_color = "gray20",
+    point_color = "gray20",
+    point_size = 2.5,
+    linewidth = 1.5
+  ) +
+  # Spread line marker at slab height
+  stat_spike(aes(x = spread_line, height = spread_line_y_prob), size = 0) +
+  # Team logos
+  geom_nfl_logos(
+    aes(x = -40, team_abbr = away_team),
+    width = 0.045
+  ) +
+  geom_nfl_logos(
+    aes(x = 40, team_abbr = home_team),
+    width = 0.045
+  ) +
+  # Cover probabilities near logos (already computed in pred_df)
+  geom_text(
+    aes(
+      x = -42,
+      label = scales::percent(away_y_cover_prob, accuracy = 1)
+    ),
+    hjust = 1,
+    vjust = 0.5,
+    size = 3.8,
+    fontface = "bold",
+    color = "gray20"
+  ) +
+  geom_text(
+    aes(
+      x = 42,
+      label = scales::percent(home_y_cover_prob, accuracy = 1)
+    ),
+    hjust = 0,
+    vjust = 0.5,
+    size = 3.8,
+    fontface = "bold",
+    color = "gray20"
+  ) +
+  scale_fill_manual(
+    values = colorspace::lighten(team_colors, amount = 0.30)
+    # values = ifelse(
+    #   TRUE,
+    #   colorspace::lighten(team_colors, amount = 0.30),
+    #   colorspace::lighten(team_colors, amount = 0.30)
+    # )
+  ) +
+  scale_x_continuous(
+    breaks = seq(-40, 40, 10),
+    minor_breaks = seq(-40, 40, 1),
+    limits = c(-45, 45)
+  ) +
+  labs(
+    title = "Predicted Score Distributions (Game Outcomes)",
+    subtitle = paste(
+      "Season",
+      attr(predict_data$result_predict, "season"),
+      "- Week",
+      attr(predict_data$result_predict, "week"),
+      "| Left of line: Away cover area | Right of line: Home cover area"
+    ),
+    x = "Point Differential (Positive = Home Team Wins)",
+    y = NULL,
+    caption = "Cover probabilities shown near logos (Pr(y < spread) away, Pr(y > spread) home)"
+  ) +
+  theme_ggdist() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
+    axis.text.y = element_text(size = 11, face = "bold"),
+    axis.text.x = element_text(size = 11),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(color = "gray80", linewidth = 0.3),
+    panel.grid.minor.x = element_line(color = "gray90", linewidth = 0.2),
+    legend.position = "none"
+  )
+
+score_dist_plot_new
+```
+
 ### Betting Opportunities
 
 Games where our model disagrees with Vegas by at least 2 points or shows high confidence.
