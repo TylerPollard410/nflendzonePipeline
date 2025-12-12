@@ -47,6 +47,9 @@ pak::pak("TylerPollard410/nflendzonePipeline")
 This report provides weekly updates on NFL team strength estimates, home
 field advantage, and game predictions using Bayesian state-space models.
 
+<details class="code-fold">
+<summary>Show the R code - libraries</summary>
+
 ``` r
 # Core data manipulation
 library(dplyr)
@@ -77,6 +80,8 @@ library(nflendzonePipeline)
 
 theme_set(theme_ggdist())
 ```
+
+</details>
 
 ## Data Setup
 
@@ -224,11 +229,24 @@ team_colors <- setNames(teams_data$team_color, teams_data$team_abbr)
 team_colors_light <- colorspace::lighten(team_colors, amount = 0.25)
 
 # Filter for the latest week
-team_strength_filter_plot <- filter_data |>
+team_strength_filter_df <- filter_data |>
   pluck("team_strength_filter") |>
   left_join(teams_data, by = c("team" = "team_abbr")) |>
   arrange(desc(E(team_strength))) |>
-  mutate(rank = row_number()) |>
+  mutate(rank = row_number())
+
+min_strength <- quantile(
+  team_strength_filter_df$team_strength,
+  probs = 0.025
+) |>
+  min()
+max_strength <- quantile(
+  team_strength_filter_df$team_strength,
+  probs = 0.975
+) |>
+  max()
+
+team_strength_filter_plot <- team_strength_filter_df |>
   ggplot(aes(y = reorder(team, team_strength))) +
   # Zero reference line (average team)
   geom_vline(
@@ -246,30 +264,30 @@ team_strength_filter_plot <- filter_data |>
   scale_fill_manual(values = team_colors_light) +
   # Team logos
   geom_nfl_logos(
-    aes(x = -14, team_abbr = team),
+    aes(x = (min_strength - 4), team_abbr = team),
     width = 0.045
   ) +
   # Rank numbers
   geom_text(
-    aes(x = -17, label = rank),
+    aes(x = (min_strength - 6.5), label = rank),
     size = 5,
     fontface = "bold",
     color = "gray10"
   ) +
   # Expected value labels - positioned to the right, outside the gradient
   geom_label(
-    aes(x = 16, label = sprintf("%.1f", E(team_strength))),
+    aes(x = (max_strength + 4), label = sprintf("%.1f", E(team_strength))),
     size = 4.5,
     fontface = "bold",
-    label.size = 0,
+    linewidth = 0,
     fill = "white",
     alpha = 0.9,
-    label.padding = unit(0.2, "lines"),
-    position = position_jitter(width = 0, height = 0.15, seed = 42)
+    label.padding = unit(0.2, "lines")
+    #position = position_jitter(width = 0, height = 0.15, seed = 42)
   ) +
   scale_x_continuous(
-    breaks = seq(-15, 15, 5),
-    limits = c(-18, 18)
+    breaks = seq((min_strength %/% 5) * 5, (max_strength %/% 5) * 5, 5),
+    limits = c(round(min_strength - 7), round(max_strength + 5))
   ) +
   labs(
     title = "NFL Team Strength Rankings",
@@ -314,34 +332,59 @@ the league norm.
 <summary>Show the R code - hfa-comparison-plot</summary>
 
 ``` r
-# Extract league HFA
-league_hfa_filter <- filter_data |>
-  pluck("league_hfa_filter")
+# Extract league HFA and compute league average (expected value)
+league_hfa_filter <- filter_data |> pluck("league_hfa_filter")
+league_hfa_mean <- E(league_hfa_filter$league_hfa)
 
-# Combine team and league HFA for comparison
-team_hfa_filter <- filter_data |>
-  pluck("team_strength_filter")
+# Team-level HFA data (contains team_hfa as an rvar)
+team_hfa_filter <- filter_data |> pluck("team_strength_filter")
 
-# Create named vector of team colors
+# Team colors
 team_colors <- setNames(teams_data$team_color, teams_data$team_abbr)
+team_colors_light <- colorspace::lighten(team_colors, amount = 0.25)
 
-hfa_comp_plot <- team_hfa_filter |>
-  left_join(league_hfa_filter) |>
-  mutate(hfa_diff = team_hfa - league_hfa) |>
+hfa_abs_plot_df <- team_hfa_filter |>
   left_join(teams_data, by = c("team" = "team_abbr")) |>
-  arrange(desc(E(hfa_diff))) |>
-  mutate(rank = row_number()) |>
-  ggplot(aes(y = reorder(team, hfa_diff))) +
-  # Zero reference (league average)
+  arrange(desc(E(team_hfa))) |>
+  mutate(rank = row_number())
+
+min_hfa <- quantile(
+  hfa_abs_plot_df$team_hfa,
+  probs = 0.025
+) |>
+  min()
+max_hfa <- quantile(
+  hfa_abs_plot_df$team_hfa,
+  probs = 0.975
+) |>
+  max()
+
+hfa_abs_plot <- hfa_abs_plot_df |>
+  ggplot(aes(y = reorder(team, team_hfa))) +
+  # Reference: league-average HFA
   geom_vline(
-    xintercept = 0,
+    xintercept = league_hfa_mean,
     linetype = "dashed",
     color = "gray30",
     linewidth = 1
   ) +
-  # Uncertainty intervals - lightened team colors with dark intervals
+  # Inline label for league average
+  annotate(
+    "label",
+    x = league_hfa_mean,
+    y = Inf,
+    label = sprintf("League avg HFA = %.2f", league_hfa_mean),
+    vjust = 1,
+    size = 4,
+    fontface = "bold",
+    color = "red",
+    fill = "white",
+    alpha = 0.9,
+    linewidth = 0
+  ) +
+  # Uncertainty intervals for team HFA
   stat_pointinterval(
-    aes(xdist = hfa_diff, fill = team),
+    aes(xdist = team_hfa, fill = team),
     .width = c(0.5, 0.95),
     point_size = 2.5,
     interval_color = "gray20",
@@ -352,43 +395,47 @@ hfa_comp_plot <- team_hfa_filter |>
   scale_fill_manual(values = team_colors_light) +
   # Team logos
   geom_nfl_logos(
-    aes(x = -3.5, team_abbr = team),
+    aes(x = min_hfa - 1.0, team_abbr = team),
     width = 0.045
   ) +
   # Rank numbers
   geom_text(
-    aes(x = -4.3, label = rank),
+    aes(x = min_hfa - 2.0, label = rank),
     size = 5,
     fontface = "bold",
     color = "gray10"
   ) +
-  # Expected value labels - positioned to the right, outside the intervals
+  # Expected value labels (absolute team HFA)
   geom_label(
-    aes(x = 4.2, label = sprintf("%+.1f", E(hfa_diff))),
+    aes(x = max_hfa + 1.0, label = sprintf("%.2f", E(team_hfa))),
     size = 4,
     fontface = "bold",
     label.size = 0,
     fill = "white",
     alpha = 0.9,
-    label.padding = unit(0.2, "lines"),
-    position = position_jitter(width = 0, height = 0.15, seed = 42)
+    label.padding = unit(0.2, "lines")
+    #position = position_jitter(width = 0, height = 0.15, seed = 42)
+  ) +
+  scale_y_discrete(
+    expand = expansion(add = c(0.5, 1.5))
   ) +
   scale_x_continuous(
-    breaks = seq(-4, 4, 1),
-    limits = c(-4.5, 4.5)
+    #breaks = scales::breaks_width(0.5),
+    breaks = seq((min_hfa %/% 0.5) * 0.5, (max_hfa %/% 0.5) * 0.5, 1),
+    limits = c(round(min_hfa) - 2, round(max_hfa) + 2)
   ) +
   labs(
-    title = "Home Field Advantage Relative to League Average",
+    title = "Team-Specific Home Field Advantage (Absolute)",
     subtitle = paste(
       "Season",
       attr(filter_data$team_strength_filter, "season"),
       "- Week",
       attr(filter_data$team_strength_filter, "week"),
-      "| Difference from league HFA in points"
+      "| Dashed line = League-average HFA"
     ),
-    x = "HFA Difference from League Average (Points)",
+    x = "Team Home Field Advantage (Points)",
     y = NULL,
-    caption = "Positive = stronger home advantage | Negative = weaker home advantage | 0 = league average"
+    caption = "Values are the absolute team HFA used in spread calculation"
   ) +
   theme_ggdist() +
   theme(
@@ -402,7 +449,7 @@ hfa_comp_plot <- team_hfa_filter |>
     panel.grid.major.x = element_line(color = "gray90", linewidth = 0.3)
   )
 
-hfa_comp_plot
+hfa_abs_plot
 ```
 
 </details>
@@ -659,25 +706,35 @@ outcomes.
 
 ``` r
 score_dist_plot <- pred_plot_df |>
-  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  mutate(y_pred = y) |>
+  ggplot(
+    aes(
+      y = reorder(matchup_display, game_idx, decreasing = TRUE)
+    )
+  ) +
+  # Zero reference (home win threshold)
   geom_vline(
     xintercept = 0,
     linetype = "solid",
     color = "gray40",
     linewidth = 0.6
   ) +
-  # Use y for full predictive distribution
+  # Halfeye with conditional fill: left of spread = away color, right = home color
   stat_halfeye(
-    aes(xdist = y, fill = home_team),
+    aes(
+      xdist = y,
+      fill = home_team
+    ),
     .width = c(0.5, 0.95),
     point_interval = "median_qi",
-    alpha = 0.8,
+    alpha = 0.85,
     slab_linewidth = 0,
     interval_color = "gray20",
     point_color = "gray20",
     point_size = 2.5,
     linewidth = 1.5
   ) +
+  # Team logos
   geom_nfl_logos(
     aes(x = -40, team_abbr = away_team),
     width = 0.045
@@ -686,7 +743,30 @@ score_dist_plot <- pred_plot_df |>
     aes(x = 40, team_abbr = home_team),
     width = 0.045
   ) +
-  scale_fill_manual(values = colorspace::lighten(team_colors, amount = 0.3)) +
+  # Cover probabilities near logos (already computed in pred_df)
+  geom_text(
+    aes(
+      x = -42,
+      label = scales::percent(away_y_cover_prob, accuracy = 1)
+    ),
+    hjust = 1,
+    vjust = 0.5,
+    size = 3.8,
+    fontface = "bold",
+    color = "gray20"
+  ) +
+  geom_text(
+    aes(
+      x = 42,
+      label = scales::percent(home_y_cover_prob, accuracy = 1)
+    ),
+    hjust = 0,
+    vjust = 0.5,
+    size = 3.8,
+    fontface = "bold",
+    color = "gray20"
+  ) +
+  scale_fill_manual(values = colorspace::lighten(team_colors, amount = 0.30)) +
   scale_x_continuous(
     breaks = seq(-40, 40, 10),
     limits = c(-45, 45)
@@ -698,11 +778,11 @@ score_dist_plot <- pred_plot_df |>
       attr(predict_data$result_predict, "season"),
       "- Week",
       attr(predict_data$result_predict, "week"),
-      "| Full predictive distributions showing 50% and 95% credible intervals"
+      "| Left of line: Away cover area | Right of line: Home cover area"
     ),
     x = "Point Differential (Positive = Home Team Wins)",
     y = NULL,
-    caption = "Uses y (full prediction) including game randomness"
+    caption = "Cover probabilities shown near logos (Pr(y < spread) away, Pr(y > spread) home)"
   ) +
   theme_ggdist() +
   theme(
