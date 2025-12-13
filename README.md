@@ -570,7 +570,7 @@ spread_plot <- pred_plot_df |>
     values_close = abs(spread_line - median(mu)) < 3
   ) |>
   ungroup() |>
-  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  ggplot(aes(y = reorder(matchup_display, game_idx, decreasing = TRUE))) +
   # Zero reference line
   geom_vline(
     xintercept = 0,
@@ -600,10 +600,10 @@ spread_plot <- pred_plot_df |>
       label = sprintf("%.1f", mu_lower_95)
     ),
     vjust = 0.5,
-    hjust = 1.2,
+    hjust = 1.5,
     size = 2.5,
     color = "#013369",
-    alpha = 0.6
+    alpha = 0.8
   ) +
   geom_text(
     aes(
@@ -611,9 +611,10 @@ spread_plot <- pred_plot_df |>
       label = sprintf("%.1f", mu_upper_95)
     ),
     vjust = 0.5,
+    hjust = -0.5,
     size = 2.5,
     color = "#013369",
-    alpha = 0.6
+    alpha = 0.8
   ) +
   # Spread line value label (horizontal positioning: lower value shifts left)
   geom_text(
@@ -707,7 +708,7 @@ win_prob_plot <- pred_plot_df |>
       team_colors[away_team]
     )
   ) |>
-  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  ggplot(aes(y = reorder(matchup_display, game_idx, decreasing = TRUE))) +
   geom_vline(
     xintercept = 0.5,
     linetype = "dashed",
@@ -1041,7 +1042,7 @@ betting_plot <- pred_plot_df |>
     aes(
       x = spread_line,
       label = sprintf("%.1f", spread_line),
-      hjust = if_else(spread_line < model_spread, 1.5, -0.5)
+      hjust = if_else(spread_line < model_spread, 1.75, -0.75)
     ),
     vjust = 0.5,
     size = 3.5,
@@ -1053,7 +1054,7 @@ betting_plot <- pred_plot_df |>
     aes(
       x = model_spread,
       label = sprintf("%.1f", model_spread),
-      hjust = if_else(model_spread < spread_line, 1.5, -0.5)
+      hjust = if_else(model_spread < spread_line, 1.75, -0.75)
     ),
     vjust = 0.5,
     size = 3.5,
