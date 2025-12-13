@@ -652,7 +652,7 @@ spread_plot <- pred_plot_df |>
     values_close = abs(spread_line - median(mu)) < 3
   ) |>
   ungroup() |>
-  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  ggplot(aes(y = reorder(matchup_display, game_idx, decreasing = TRUE))) +
   # Zero reference line
   geom_vline(
     xintercept = 0,
@@ -682,10 +682,10 @@ spread_plot <- pred_plot_df |>
       label = sprintf("%.1f", mu_lower_95)
     ),
     vjust = 0.5,
-    hjust = 1.2,
+    hjust = 1.5,
     size = 2.5,
     color = "#013369",
-    alpha = 0.6
+    alpha = 0.8
   ) +
   geom_text(
     aes(
@@ -693,9 +693,10 @@ spread_plot <- pred_plot_df |>
       label = sprintf("%.1f", mu_upper_95)
     ),
     vjust = 0.5,
+    hjust = -0.5,
     size = 2.5,
     color = "#013369",
-    alpha = 0.6
+    alpha = 0.8
   ) +
   # Spread line value label (horizontal positioning: lower value shifts left)
   geom_text(
@@ -788,7 +789,7 @@ win_prob_plot <- pred_plot_df |>
       team_colors[away_team]
     )
   ) |>
-  ggplot(aes(y = reorder(matchup_display, game_idx))) +
+  ggplot(aes(y = reorder(matchup_display, game_idx, decreasing = TRUE))) +
   geom_vline(
     xintercept = 0.5,
     linetype = "dashed",
@@ -850,130 +851,6 @@ win_prob_plot
 ### Predicted Score Distributions
 
 Full predictive distribution for each game showing all possible outcomes.
-
-```{r}
-#| label: score-dist-plot
-#| eval: false
-#| echo: false
-# code-fold: true
-# code-summary: "Show the R code - score-dist-plot"
-# fig-align: center
-# fig-width: 11
-# fig-height: 9
-
-# Calculate dynamic x-axis limits based on the predicted distributions
-min_y_pred <- quantile(
-  pred_plot_df$y,
-  probs = 0.001
-) |>
-  min()
-max_y_pred <- quantile(
-  pred_plot_df$y,
-  probs = 0.999
-) |>
-  max()
-
-# Add padding for logos and text
-x_padding <- 5
-x_min <- floor(min_y_pred / 5) * 5 - x_padding
-x_max <- ceiling(max_y_pred / 5) * 5 + x_padding
-
-score_dist_plot <- pred_plot_df |>
-  ggplot(
-    aes(
-      y = reorder(matchup_display, game_idx, decreasing = TRUE)
-    )
-  ) +
-  # Zero reference (home win threshold)
-  geom_vline(
-    xintercept = 0,
-    linetype = "solid",
-    color = "gray40",
-    linewidth = 0.6
-  ) +
-  # Halfeye with conditional fill: left of spread = away color, right = home color
-  stat_halfeye(
-    aes(
-      xdist = y,
-      fill = home_team
-    ),
-    .width = c(0.5, 0.95),
-    point_interval = "median_qi",
-    alpha = 0.85,
-    slab_linewidth = 0,
-    interval_color = "gray20",
-    point_color = "gray20",
-    point_size = 2.5,
-    linewidth = 1.5
-  ) +
-  # Team logos
-  geom_nfl_logos(
-    aes(x = x_min + 3, team_abbr = away_team),
-    width = 0.045
-  ) +
-  geom_nfl_logos(
-    aes(x = x_max - 3, team_abbr = home_team),
-    width = 0.045
-  ) +
-  # Cover probabilities near logos (already computed in pred_df)
-  geom_text(
-    aes(
-      x = x_min + 1,
-      label = scales::percent(away_y_cover_prob, accuracy = 1)
-    ),
-    hjust = 1,
-    vjust = 0.5,
-    size = 3.8,
-    fontface = "bold",
-    color = "gray20"
-  ) +
-  geom_text(
-    aes(
-      x = x_max - 1,
-      label = scales::percent(home_y_cover_prob, accuracy = 1)
-    ),
-    hjust = 0,
-    vjust = 0.5,
-    size = 3.8,
-    fontface = "bold",
-    color = "gray20"
-  ) +
-  scale_fill_manual(values = colorspace::lighten(team_colors, amount = 0.30)) +
-  scale_x_continuous(
-    breaks = seq(
-      floor(min_y_pred / 10) * 10,
-      ceiling(max_y_pred / 10) * 10,
-      10
-    ),
-    limits = c(x_min, x_max)
-  ) +
-  labs(
-    title = "Predicted Score Distributions (Game Outcomes)",
-    subtitle = paste(
-      "Season",
-      attr(predict_data$result_predict, "season"),
-      "- Week",
-      attr(predict_data$result_predict, "week"),
-      "| Left of line: Away cover area | Right of line: Home cover area"
-    ),
-    x = "Point Differential (Positive = Home Team Wins)",
-    y = NULL,
-    caption = "Cover probabilities shown near logos (Pr(y < spread) away, Pr(y > spread) home)"
-  ) +
-  theme_ggdist() +
-  theme(
-    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 11, hjust = 0.5),
-    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
-    axis.text.y = element_text(size = 11, face = "bold"),
-    axis.text.x = element_text(size = 11),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    legend.position = "none"
-  )
-
-score_dist_plot
-```
 
 ```{r}
 #| label: score-dist-plot-new
@@ -1242,7 +1119,7 @@ betting_plot <- pred_plot_df |>
     aes(
       x = spread_line,
       label = sprintf("%.1f", spread_line),
-      hjust = if_else(spread_line < model_spread, 1.5, -0.5)
+      hjust = if_else(spread_line < model_spread, 1.75, -0.75)
     ),
     vjust = 0.5,
     size = 3.5,
@@ -1254,7 +1131,7 @@ betting_plot <- pred_plot_df |>
     aes(
       x = model_spread,
       label = sprintf("%.1f", model_spread),
-      hjust = if_else(model_spread < spread_line, 1.5, -0.5)
+      hjust = if_else(model_spread < spread_line, 1.75, -0.75)
     ),
     vjust = 0.5,
     size = 3.5,
