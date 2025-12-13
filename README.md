@@ -521,6 +521,11 @@ pred_plot_df <- pred_df |>
       paste0(away_team, " vs ", home_team, " (N)")
     )
   ) |>
+  #rowwise() |>
+  # mutate(
+  #   spread_line_y_prob = density(y, at = spread_line)
+  # ) |>
+  #ungroup() |>
   arrange(game_idx)
 ```
 
@@ -535,7 +540,36 @@ show the expected differential with uncertainty intervals.
 <summary>Show the R code - spread-comparison-plot</summary>
 
 ``` r
+# Calculate dynamic x-axis limits based on mu distribution
+min_mu_data <- quantile(
+  pred_plot_df$mu,
+  probs = 0.025
+) |>
+  min()
+max_mu_data <- quantile(
+  pred_plot_df$mu,
+  probs = 0.975
+) |>
+  max()
+
+# Calculate logo and text positions
+away_logo_pos_spread <- min_mu_data - 5
+home_logo_pos_spread <- max_mu_data + 5
+
+# Calculate x-axis limits
+x_min_spread <- floor((min_mu_data - 5) / 5) * 5
+x_max_spread <- ceiling((max_mu_data + 5) / 5) * 5
+
 spread_plot <- pred_plot_df |>
+  rowwise() |>
+  mutate(
+    # Calculate interval bounds for labels (per-game)
+    mu_lower_95 = median(quantile(mu, 0.025)),
+    mu_upper_95 = median(quantile(mu, 0.975)),
+    # Check if spread and mu are close (for label positioning)
+    values_close = abs(spread_line - median(mu)) < 3
+  ) |>
+  ungroup() |>
   ggplot(aes(y = reorder(matchup_display, game_idx))) +
   # Zero reference line
   geom_vline(
@@ -544,16 +578,7 @@ spread_plot <- pred_plot_df |>
     color = "gray60",
     linewidth = 0.5
   ) +
-  # Predicted game outcome (y) - wider uncertainty including game randomness
-  stat_pointinterval(
-    aes(xdist = y),
-    .width = c(0.5, 0.95),
-    point_size = 3.5,
-    linewidth = 1.3,
-    color = "gray50",
-    alpha = 0.4
-  ) +
-  # Expected value (mu) - tighter uncertainty, parameter only
+  # Expected value (mu) - model's best estimate with uncertainty
   stat_pointinterval(
     aes(xdist = mu),
     .width = c(0.66, 0.95),
@@ -568,18 +593,68 @@ spread_plot <- pred_plot_df |>
     size = 5.5,
     shape = 18
   ) +
-  # Add team logos
+  # 95% interval bound labels
+  geom_text(
+    aes(
+      x = mu_lower_95,
+      label = sprintf("%.1f", mu_lower_95)
+    ),
+    vjust = 0.5,
+    hjust = 1.2,
+    size = 2.5,
+    color = "#013369",
+    alpha = 0.6
+  ) +
+  geom_text(
+    aes(
+      x = mu_upper_95,
+      label = sprintf("%.1f", mu_upper_95)
+    ),
+    vjust = 0.5,
+    size = 2.5,
+    color = "#013369",
+    alpha = 0.6
+  ) +
+  # Spread line value label (horizontal positioning: lower value shifts left)
+  geom_text(
+    aes(
+      x = spread_line,
+      label = sprintf("%.1f", spread_line),
+      hjust = if_else(spread_line < median(mu), 1.2, -0.2)
+    ),
+    vjust = -1,
+    size = 3.5,
+    fontface = "bold",
+    color = "#D50A0A"
+  ) +
+  # Model mu value label (horizontal positioning: lower value shifts left)
+  geom_text(
+    aes(
+      x = median(mu),
+      label = sprintf("%.1f", median(mu)),
+      hjust = if_else(median(mu) < spread_line, 1.2, -0.2)
+    ),
+    vjust = -1,
+    size = 3.5,
+    fontface = "bold",
+    color = "#013369"
+  ) +
+  # Add team logos (dynamic positioning)
   geom_nfl_logos(
-    aes(x = -32, team_abbr = away_team),
+    aes(x = away_logo_pos_spread, team_abbr = away_team),
     width = 0.04
   ) +
   geom_nfl_logos(
-    aes(x = 32, team_abbr = home_team),
+    aes(x = home_logo_pos_spread, team_abbr = home_team),
     width = 0.04
   ) +
   scale_x_continuous(
-    breaks = seq(-30, 30, 10),
-    limits = c(-35, 35)
+    breaks = seq(
+      floor(min_mu_data / 5) * 5,
+      ceiling(max_mu_data / 5) * 5,
+      5
+    ),
+    limits = c(x_min_spread, x_max_spread)
   ) +
   labs(
     title = "Model Predictions vs Betting Lines",
@@ -588,11 +663,11 @@ spread_plot <- pred_plot_df |>
       attr(predict_data$result_predict, "season"),
       "- Week",
       attr(predict_data$result_predict, "week"),
-      "| Gray: Full prediction (y) | Blue: Expected value (mu) | Red: Vegas line"
+      "| Blue: Model expectation (μ) with uncertainty | Red: Vegas spread line"
     ),
     x = "Point Differential (Positive = Home Team Favored)",
     y = NULL,
-    caption = "Gray shows game prediction uncertainty | Blue shows model's best estimate | Use y (gray) for betting decisions"
+    caption = "Intervals show 66% and 95% credible intervals for model parameter | Full prediction distributions shown in subsequent plots"
   ) +
   theme_ggdist() +
   theme(
@@ -705,130 +780,48 @@ outcomes.
 <summary>Show the R code - score-dist-plot</summary>
 
 ``` r
-score_dist_plot <- pred_plot_df |>
-  mutate(y_pred = y) |>
-  ggplot(
-    aes(
-      y = reorder(matchup_display, game_idx, decreasing = TRUE)
-    )
-  ) +
-  # Zero reference (home win threshold)
-  geom_vline(
-    xintercept = 0,
-    linetype = "solid",
-    color = "gray40",
-    linewidth = 0.6
-  ) +
-  # Halfeye with conditional fill: left of spread = away color, right = home color
-  stat_halfeye(
-    aes(
-      xdist = y,
-      fill = home_team
-    ),
-    .width = c(0.5, 0.95),
-    point_interval = "median_qi",
-    alpha = 0.85,
-    slab_linewidth = 0,
-    interval_color = "gray20",
-    point_color = "gray20",
-    point_size = 2.5,
-    linewidth = 1.5
-  ) +
-  # Team logos
-  geom_nfl_logos(
-    aes(x = -40, team_abbr = away_team),
-    width = 0.045
-  ) +
-  geom_nfl_logos(
-    aes(x = 40, team_abbr = home_team),
-    width = 0.045
-  ) +
-  # Cover probabilities near logos (already computed in pred_df)
-  geom_text(
-    aes(
-      x = -42,
-      label = scales::percent(away_y_cover_prob, accuracy = 1)
-    ),
-    hjust = 1,
-    vjust = 0.5,
-    size = 3.8,
-    fontface = "bold",
-    color = "gray20"
-  ) +
-  geom_text(
-    aes(
-      x = 42,
-      label = scales::percent(home_y_cover_prob, accuracy = 1)
-    ),
-    hjust = 0,
-    vjust = 0.5,
-    size = 3.8,
-    fontface = "bold",
-    color = "gray20"
-  ) +
-  scale_fill_manual(values = colorspace::lighten(team_colors, amount = 0.30)) +
-  scale_x_continuous(
-    breaks = seq(-40, 40, 10),
-    limits = c(-45, 45)
-  ) +
-  labs(
-    title = "Predicted Score Distributions (Game Outcomes)",
-    subtitle = paste(
-      "Season",
-      attr(predict_data$result_predict, "season"),
-      "- Week",
-      attr(predict_data$result_predict, "week"),
-      "| Left of line: Away cover area | Right of line: Home cover area"
-    ),
-    x = "Point Differential (Positive = Home Team Wins)",
-    y = NULL,
-    caption = "Cover probabilities shown near logos (Pr(y < spread) away, Pr(y > spread) home)"
-  ) +
-  theme_ggdist() +
-  theme(
-    plot.title = element_text(size = 17, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 11, hjust = 0.5),
-    plot.caption = element_text(size = 9, hjust = 0.5, color = "gray40"),
-    axis.text.y = element_text(size = 11, face = "bold"),
-    axis.text.x = element_text(size = 11),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    legend.position = "none"
-  )
-
-score_dist_plot
-```
-
-</details>
-
-<img src="man/figures/README-score-dist-plot-1.png"
-data-fig-align="center" />
-
-<details class="code-fold">
-<summary>Show the R code - score-dist-plot</summary>
-
-``` r
-min_y_pred <- quantile(
+# Calculate dynamic x-axis limits based on 95% intervals (to match trimmed slabs)
+min_y_data <- quantile(
   pred_plot_df$y,
-  probs = 0
+  probs = 0.025
 ) |>
   min()
-max_y_pred <- quantile(
+max_y_data <- quantile(
   pred_plot_df$y,
-  probs = 1
+  probs = 0.975
 ) |>
   max()
 
-pred_plot_df2 <- pred_plot_df |>
-  tidybayes::unnest_rvars() |>
-  tidybayes::sample_draws(ndraws = 4000, seed = 52)
+# Calculate logo and text positions (relative to data bounds)
+away_logo_pos <- min_y_data - 5
+home_logo_pos <- max_y_data + 5
+away_text_pos <- min_y_data - 8
+home_text_pos <- max_y_data + 8
+
+# Calculate x-axis limits to accommodate logos/text with margin
+x_min_new <- floor((min_y_data - 6) / 5) * 5
+x_max_new <- ceiling((max_y_data + 6) / 5) * 5
+
+# Calculate 95% interval bounds for trimming (per-game)
+pred_plot_df_bounds <- pred_plot_df |>
+  rowwise() |>
+  mutate(
+    y_lower = median(quantile(y, 0.025)),
+    y_upper = median(quantile(y, 0.975))
+  ) |>
+  ungroup()
+
+pred_plot_df2 <- pred_plot_df_bounds |>
+  tibble::as_tibble() |>
+  tidybayes::unnest_rvars()
 
 # Create data subsets for two-toned slabs with smooth density
+# Filter to 95% interval to trim the tails
 pred_plot_df_away <- pred_plot_df2 |>
-  filter(y < spread_line)
+  filter(y >= y_lower & y <= y_upper & y < spread_line)
 
 pred_plot_df_home <- pred_plot_df2 |>
-  filter(y >= spread_line)
+  filter(y >= y_lower & y <= y_upper & y >= spread_line)
 
 score_dist_plot_new <- pred_plot_df |>
   mutate(
@@ -854,7 +847,7 @@ score_dist_plot_new <- pred_plot_df |>
       y = reorder(matchup_display, game_idx, decreasing = TRUE),
       fill = away_team
     ),
-    adjust = 1.5,
+    adjust = 4,
     alpha = 0.85,
     slab_linewidth = 0,
     normalize = "groups",
@@ -867,7 +860,7 @@ score_dist_plot_new <- pred_plot_df |>
       y = reorder(matchup_display, game_idx, decreasing = TRUE),
       fill = home_team
     ),
-    adjust = 1.5,
+    adjust = 4,
     alpha = 0.85,
     slab_linewidth = 0,
     normalize = "groups",
@@ -884,20 +877,23 @@ score_dist_plot_new <- pred_plot_df |>
     linewidth = 1.5
   ) +
   # Spread line marker at slab height
-  stat_spike(aes(x = spread_line, height = spread_line_y_prob), size = 0) +
-  # Team logos
+  stat_spike(
+    aes(x = spread_line, height = spread_line_y_prob),
+    size = 0
+  ) +
+  # Team logos (positioned relative to data bounds)
   geom_nfl_logos(
-    aes(x = -40, team_abbr = away_team),
+    aes(x = away_logo_pos, team_abbr = away_team),
     width = 0.045
   ) +
   geom_nfl_logos(
-    aes(x = 40, team_abbr = home_team),
+    aes(x = home_logo_pos, team_abbr = home_team),
     width = 0.045
   ) +
-  # Cover probabilities near logos (already computed in pred_df)
+  # Cover probabilities near logos
   geom_text(
     aes(
-      x = -42,
+      x = away_text_pos,
       label = scales::percent(away_y_cover_prob, accuracy = 1)
     ),
     hjust = 1,
@@ -908,7 +904,7 @@ score_dist_plot_new <- pred_plot_df |>
   ) +
   geom_text(
     aes(
-      x = 42,
+      x = home_text_pos,
       label = scales::percent(home_y_cover_prob, accuracy = 1)
     ),
     hjust = 0,
@@ -919,17 +915,21 @@ score_dist_plot_new <- pred_plot_df |>
   ) +
   scale_fill_manual(
     values = colorspace::lighten(team_colors, amount = 0.30)
-    # values = ifelse(
-    #   TRUE,
-    #   colorspace::lighten(team_colors, amount = 0.30),
-    #   colorspace::lighten(team_colors, amount = 0.30)
-    # )
   ) +
   scale_x_continuous(
-    breaks = seq(-40, 40, 10),
-    minor_breaks = seq(-40, 40, 1),
-    limits = c(-45, 45)
+    breaks = seq(
+      floor(min_y_data / 10) * 10,
+      ceiling(max_y_data / 10) * 10,
+      10
+    ),
+    minor_breaks = seq(
+      floor(min_y_data / 10) * 10,
+      ceiling(max_y_data / 10) * 10,
+      1
+    ),
+    limits = c(x_min_new, x_max_new)
   ) +
+  #scale_thickness_shared() +
   labs(
     title = "Predicted Score Distributions (Game Outcomes)",
     subtitle = paste(
@@ -989,8 +989,13 @@ betting_plot <- pred_plot_df |>
     linewidth = 0.6
   ) +
   # Arrow showing edge direction - draw first so it's under points
+  # Arrow tip stops just before the point so it's visible
   geom_segment(
-    aes(x = spread_line, xend = model_spread, yend = matchup_display),
+    aes(
+      x = spread_line,
+      xend = model_spread - sign(model_spread - spread_line) * 0.4,
+      yend = matchup_display
+    ),
     arrow = arrow(length = unit(0.3, "cm"), type = "closed"),
     linewidth = 1.8,
     color = "#013369",
@@ -1027,6 +1032,30 @@ betting_plot <- pred_plot_df |>
       label = sprintf("%d%%", round(y_cover_prob * 100))
     ),
     vjust = 1.8,
+    size = 4.5,
+    fontface = "bold",
+    color = "#013369"
+  ) +
+  # Spread line value label (on outside edge)
+  geom_text(
+    aes(
+      x = spread_line,
+      label = sprintf("%.1f", spread_line),
+      hjust = if_else(spread_line < model_spread, 1.5, -0.5)
+    ),
+    vjust = 0.5,
+    size = 3.5,
+    fontface = "bold",
+    color = "#D50A0A"
+  ) +
+  # Model spread value label (on outside edge)
+  geom_text(
+    aes(
+      x = model_spread,
+      label = sprintf("%.1f", model_spread),
+      hjust = if_else(model_spread < spread_line, 1.5, -0.5)
+    ),
+    vjust = 0.5,
     size = 3.5,
     fontface = "bold",
     color = "#013369"
