@@ -46,18 +46,23 @@
 #' @importFrom tidyr pivot_wider
 #' @export
 #' @noRd
-clean_teamopponent <- function(df,
-                               game_id        = "game_id",
-                               location       = "location",
-                               remove_opponent = TRUE) {
+clean_teamopponent <- function(
+  df,
+  game_id = "game_id",
+  location = "location",
+  remove_opponent = TRUE
+) {
   # 1) Basic sanity checks
   if (!is.data.frame(df)) {
     stop("`df` must be a data.frame or tibble.")
   }
   if (!all(c(game_id, location) %in% names(df))) {
     stop(
-      "`df` must contain columns named '", game_id,
-      "' and '", location, "'."
+      "`df` must contain columns named '",
+      game_id,
+      "' and '",
+      location,
+      "'."
     )
   }
   # Preserve original attributes for later
@@ -70,8 +75,11 @@ clean_teamopponent <- function(df,
   counts_per_game <- table(df[[game_id]])
   if (any(counts_per_game != 2)) {
     stop(
-      "Each `", game_id, "` must appear in exactly two rows. ",
-      "Found counts: ", paste(names(counts_per_game), counts_per_game, collapse = ", ")
+      "Each `",
+      game_id,
+      "` must appear in exactly two rows. ",
+      "Found counts: ",
+      paste(names(counts_per_game), counts_per_game, collapse = ", ")
     )
   }
 
@@ -80,8 +88,13 @@ clean_teamopponent <- function(df,
   if (!all(df[[location]] %in% valid_locs)) {
     bad <- unique(df[[location]][!df[[location]] %in% valid_locs])
     stop(
-      "Invalid ", location, " values: ", paste(bad, collapse = ", "),
-      ". Must be one of: ", paste(valid_locs, collapse = ", "), "."
+      "Invalid ",
+      location,
+      " values: ",
+      paste(bad, collapse = ", "),
+      ". Must be one of: ",
+      paste(valid_locs, collapse = ", "),
+      "."
     )
   }
 
@@ -93,7 +106,7 @@ clean_teamopponent <- function(df,
       location2 = ifelse(
         all(location == "neutral"),
         c("home", "away"),
-        location  # otherwise keep original "home" or "away"
+        location # otherwise keep original "home" or "away"
       )
     ) |>
     dplyr::ungroup() |>
@@ -106,11 +119,11 @@ clean_teamopponent <- function(df,
   # 7) Perform the pivot to wide form
   wide_df <- df |>
     tidyr::pivot_wider(
-      id_cols     = {{game_id}},
-      names_from   = tidyselect::all_of(location),
-      names_glue   = "{location}_{.value}",
-      values_from  = tidyselect::all_of(pivot_cols),
-      values_fill  = list(.default = NA)
+      id_cols = {{ game_id }},
+      names_from = tidyselect::all_of(location),
+      names_glue = "{location}_{.value}",
+      values_from = tidyselect::all_of(pivot_cols),
+      values_fill = list(.default = NA)
     )
 
   # 8) Optionally drop home_opponent / away_opponent if they exist
@@ -124,13 +137,23 @@ clean_teamopponent <- function(df,
 
   # 9) Restore original classes/attributes (other than column names, which have changed)
   #    We need to keep attributes like “nflverse_type” if present.
-  core_attrs <- attributes(wide_df)[c("names", "row.names", ".internal.selfref")]
-  new_attrs  <- original_attrs[setdiff(names(original_attrs), c("names", "row.names", ".internal.selfref"))]
+  core_attrs <- attributes(wide_df)[c(
+    "names",
+    "row.names",
+    ".internal.selfref"
+  )]
+  new_attrs <- original_attrs[setdiff(
+    names(original_attrs),
+    c("names", "row.names", ".internal.selfref")
+  )]
   attributes(wide_df) <- c(core_attrs, new_attrs)
 
   # 10) If there was an nflverse_type attribute, append "by game" to it
   if ("nflverse_type" %in% names(attributes(wide_df))) {
-    attr(wide_df, "nflverse_type") <- paste(attr(wide_df, "nflverse_type"), "by game")
+    attr(wide_df, "nflverse_type") <- paste(
+      attr(wide_df, "nflverse_type"),
+      "by game"
+    )
   }
 
   wide_df
@@ -187,12 +210,17 @@ clean_team_abbrs_auto <- function(x, verbose = FALSE) {
   }
 
   #--- build allowed set of raw team codes for `%in%` detection ---------------
-  allowed <- try({
-    teams_df <- nflreadr::load_teams(current = TRUE)
-    # primary: nflreadr mapping column (simple & robust)
-    if (!"team_abbr" %in% names(teams_df)) stop("no_col")
-    unique(stats::na.omit(as.character(teams_df$team_abbr)))
-  }, silent = TRUE)
+  allowed <- try(
+    {
+      teams_df <- nflreadr::load_teams(current = TRUE)
+      # primary: nflreadr mapping column (simple & robust)
+      if (!"team_abbr" %in% names(teams_df)) {
+        stop("no_col")
+      }
+      unique(stats::na.omit(as.character(teams_df$team_abbr)))
+    },
+    silent = TRUE
+  )
 
   #--- vector path ------------------------------------------------------------
   if (is.character(x) || is.factor(x)) {
@@ -202,16 +230,24 @@ clean_team_abbrs_auto <- function(x, verbose = FALSE) {
   #--- data frame / list path -------------------------------------------------
   is_df <- is.data.frame(x)
   if (!(is_df || is.list(x))) {
-    stop("`x` must be a character/factor vector, a data.frame/tibble, or a named list.")
+    stop(
+      "`x` must be a character/factor vector, a data.frame/tibble, or a named list."
+    )
   }
 
-  df <- if (is_df) x else as.data.frame(x, stringsAsFactors = FALSE, optional = TRUE)
+  df <- if (is_df) {
+    x
+  } else {
+    as.data.frame(x, stringsAsFactors = FALSE, optional = TRUE)
+  }
 
   # exact-match detector: does the column contain ANY known team code?
   is_team_col <- vapply(
     df,
     function(col) {
-      if (!(is.character(col) || is.factor(col))) return(FALSE)
+      if (!(is.character(col) || is.factor(col))) {
+        return(FALSE)
+      }
       any(as.character(col) %in% allowed, na.rm = TRUE)
     },
     logical(1)
@@ -245,7 +281,6 @@ clean_team_abbrs_auto <- function(x, verbose = FALSE) {
     out
   }
 }
-
 
 
 #' Add a Consecutive Week Sequence Across Seasons
@@ -298,5 +333,52 @@ add_week_seq <- function(df) {
     dplyr::relocate(week_seq, .after = week)
 }
 
+#' Check whether two values represent the same number.
+#'
+#' Handles `NULL`, `NA`, and numeric-ish inputs (characters are coerced).
+#' @export
+#' @noRd
+same_number <- function(x, y) {
+  if (is.null(x) || is.null(y)) {
+    return(FALSE)
+  }
+  if (length(x) == 0L || length(y) == 0L) {
+    return(FALSE)
+  }
 
+  x <- x[[1]]
+  y <- y[[1]]
 
+  if (is.na(x) || is.na(y)) {
+    return(is.na(x) && is.na(y))
+  }
+
+  isTRUE(all.equal(as.numeric(x), as.numeric(y)))
+}
+
+#' Convert probability to American odds (implied / fair odds).
+#'
+#' @param p Numeric vector of probabilities in [0, 1].
+#' @param digits Integer; rounding for returned odds.
+#' @return Integer vector (American odds); `NA` for invalid inputs.
+#' @export
+#' @noRd
+prob_to_american_odds <- function(p, digits = 0L) {
+  p <- as.numeric(p)
+
+  out <- rep(NA_real_, length(p))
+  ok <- is.finite(p) & !is.na(p) & p >= 0 & p <= 1
+
+  out[ok & p == 1] <- -Inf
+  out[ok & p == 0] <- Inf
+
+  fav <- ok & p > 0 & p < 1 & p > 0.5
+  dog <- ok & p > 0 & p < 1 & p < 0.5
+  even <- ok & p == 0.5
+
+  out[fav] <- -100 * (p[fav] / (1 - p[fav]))
+  out[dog] <- 100 * ((1 - p[dog]) / p[dog])
+  out[even] <- 100
+
+  as.integer(round(out, digits = digits))
+}
