@@ -358,7 +358,7 @@ same_number <- function(x, y) {
 
 #' Convert probability to American odds (implied / fair odds).
 #'
-#' @param p Numeric vector of probabilities in [0, 1].
+#' @param p Numeric vector of probabilities in 0, 1 (inclusive).
 #' @param digits Integer; rounding for returned odds.
 #' @return Integer vector (American odds); `NA` for invalid inputs.
 #' @export

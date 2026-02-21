@@ -1,6 +1,6 @@
 Package: nflendzonePipeline
 Title: EndZone Analytics NFL Data Pipeline
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: 
     person("Tyler", "Pollard", , "tylerpollard410@gmail.com", role = c("aut", "cre"))
 Description: Provides data processing, transformation, and ETL scripts for
@@ -24,10 +24,27 @@ Imports:
     purrr,
     readr,
     slider,
+    stats,
     stringr,
     tibble,
     tidyr,
     tidyselect
+Suggests: 
+    bayesplot,
+    colorspace,
+    distributional,
+    ggdist,
+    knitr,
+    nflendzoneModel,
+    nflplotR,
+    patchwork,
+    posterior,
+    rmarkdown,
+    scales,
+    tidybayes,
+    tidyverse
+VignetteBuilder: 
+    quarto
 Remotes:
     ropensci/piggyback
 Config/testthat/edition: 3
@@ -36,7 +53,3 @@ Language: en-US
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Suggests: 
-    knitr,
-    quarto
-VignetteBuilder: quarto
