@@ -356,6 +356,31 @@ same_number <- function(x, y) {
   isTRUE(all.equal(as.numeric(x), as.numeric(y)))
 }
 
+#' Convert American odds to implied probability.
+#'
+#' @param odds Numeric vector of American odds.
+#' @return Numeric vector in 0, 1 (inclusive).
+#' @export
+#' @noRd
+american_odds_to_prob <- function(odds) {
+  odds <- as.numeric(odds)
+
+  out <- rep(NA_real_, length(odds))
+  out[odds == -Inf] <- 1
+  out[odds == Inf] <- 0
+
+  ok <- is.finite(odds) & !is.na(odds)
+  fav <- ok & odds < 0
+  dog <- ok & odds > 0
+  even <- ok & odds == 0
+
+  out[fav] <- abs(odds[fav]) / (abs(odds[fav]) + 100)
+  out[dog] <- 100 / (odds[dog] + 100)
+  out[even] <- 0.5
+
+  out
+}
+
 #' Convert probability to American odds (implied / fair odds).
 #'
 #' @param p Numeric vector of probabilities in 0, 1 (inclusive).
