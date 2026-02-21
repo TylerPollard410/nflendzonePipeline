@@ -5,5 +5,7 @@
 ^README\.qmd$
 ^CODE_OF_CONDUCT\.md$
 ^artifacts$
+^data-raw$
+^data-raw/
 ^vignettes/\.quarto$
 ^vignettes/*_files$
