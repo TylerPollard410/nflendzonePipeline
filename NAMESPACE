@@ -3,6 +3,7 @@
 export(add_flexible_net_features)
 export(add_nflverse_ids)
 export(add_week_seq)
+export(american_odds_to_prob)
 export(calc_elo_ratings)
 export(calc_epa_ratings)
 export(calc_nflverse_stats)
