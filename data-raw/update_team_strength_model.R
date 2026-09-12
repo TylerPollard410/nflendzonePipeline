@@ -25,7 +25,7 @@ library(nflseedR)
 
 library(nflendzoneModel)
 library(nflendzonePipeline)
-library(nflendzone)
+# library(nflendzone)
 
 set.seed(52)
 
@@ -50,7 +50,7 @@ current_week <- nflreadr::get_current_week()
 
 # Load game data
 # Replace with: game_data_full <- nflendzone::load_game_data(seasons = all_seasons)
-game_data_full <- nflendzone::load_game_data(seasons = all_seasons)
+game_data_full <- nflendzonePipeline::load_game_data(seasons = all_seasons)
 # filter(!is.na(result))
 # transmute(
 #   game_id,
@@ -116,16 +116,16 @@ gq_stan_data <- prepare_gq_data(
 # ============================================================================ #
 
 # Globals
-fit_seed = 52
-fit_init = 0
-fit_sig_figs = 10
-fit_chains = 4
-fit_parallel = parallel::detectCores()
-fit_warm = 1000
-fit_samps = 1000
-fit_thin = 1
-fit_adapt_delta = 0.95
-fit_max_treedepth = 10
+fit_seed <- 52
+fit_init <- 0
+fit_sig_figs <- 10
+fit_chains <- 4
+fit_parallel <- parallel::detectCores()
+fit_warm <- 1000
+fit_samps <- 1000
+fit_thin <- 1
+fit_adapt_delta <- 0.95
+fit_max_treedepth <- 10
 
 cat("\n=== Fitting Model ===\n")
 
