@@ -62,10 +62,7 @@ jobs:
 
       - name: Install Stan model packages
         run: |
-          Rscript -e 'remotes::install_github(c(
-            "TylerPollard410/nflendzoneModel",
-            "TylerPollard410/nflendzone"
-          ))'
+          Rscript -e 'remotes::install_github("TylerPollard410/nflendzoneModel")'
           Rscript -e 'install.packages(".", repos = NULL, type = "source")'
 
       - name: Run team strength model pipeline
