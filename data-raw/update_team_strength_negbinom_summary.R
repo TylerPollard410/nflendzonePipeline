@@ -165,9 +165,18 @@ suppressWarnings(
 )
 
 summary_files <- c(
-  rds = file.path(tempdir(), paste0(summary_tag, "_", filter_season, ".rds")),
-  parquet = file.path(tempdir(), paste0(summary_tag, "_", filter_season, ".parquet")),
-  arrow = file.path(tempdir(), paste0(summary_tag, "_", filter_season, ".arrow"))
+  rds = file.path(
+    tempdir(),
+    paste0(summary_tag, "_", predict_season, "_", predict_week, ".rds")
+  ),
+  parquet = file.path(
+    tempdir(),
+    paste0(summary_tag, "_", predict_season, "_", predict_week, ".parquet")
+  ),
+  arrow = file.path(
+    tempdir(),
+    paste0(summary_tag, "_", predict_season, "_", predict_week, ".arrow")
+  )
 )
 
 saveRDS(nb_sum, summary_files[["rds"]])
@@ -189,8 +198,10 @@ purrr::walk(
 )
 
 cat(sprintf(
-  "\nUploaded %s for filtered S%s W%s, predicted S%s W%s.\n",
+  "\nUploaded %s_%s_%s for filtered S%s W%s, predicted S%s W%s.\n",
   summary_tag,
+  predict_season,
+  predict_week,
   filter_season,
   filter_week,
   predict_season,
