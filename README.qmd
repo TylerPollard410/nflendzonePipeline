@@ -65,7 +65,6 @@ library(posterior)
 # NFL packages (keep these five at the end)
 library(nflreadr)
 library(nflplotR)
-library(nflendzone)
 library(nflendzoneModel)
 library(nflendzonePipeline)
 
@@ -83,8 +82,8 @@ Load game data and team information from all available seasons.
 
 all_seasons <- 2002:nflreadr::most_recent_season()
 teams_data <- nflreadr::load_teams(current = TRUE)
-game_data <- load_game_data(seasons = all_seasons)
-game_data_long <- load_game_data_long(game_df = game_data)
+game_data <- nflendzonePipeline::load_game_data(seasons = all_seasons)
+game_data_long <- nflendzonePipeline::load_game_data_long(game_df = game_data)
 season_weeks_df <- game_data |>
   dplyr::distinct(season, week, week_seq)
 
@@ -556,10 +555,33 @@ result_predict <- predict_data |>
 #   .after = y
 # )
 
-pred_df <- inner_join(
-  result_predict,
-  game_data
-) |>
+prediction_key <- paste(
+  result_predict$game_id,
+  result_predict$season,
+  result_predict$week,
+  result_predict$home_team,
+  result_predict$away_team,
+  sep = "|"
+)
+schedule_key <- paste(
+  game_data$game_id,
+  game_data$season,
+  game_data$week,
+  game_data$home_team,
+  game_data$away_team,
+  sep = "|"
+)
+schedule_idx <- match(prediction_key, schedule_key)
+
+if (anyNA(schedule_idx)) {
+  stop("Could not match all predicted games to schedule rows.")
+}
+
+pred_df <- result_predict |>
+  mutate(
+    spread_line = game_data$spread_line[schedule_idx],
+    .after = away_team
+  ) |>
   mutate(
     home_mu_cover_prob = Pr(mu > spread_line),
     home_y_cover_prob = Pr(y > spread_line),
