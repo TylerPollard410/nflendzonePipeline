@@ -12930,3 +12930,7 @@ game_id,season,week,team,opponent,location,turnover_diff,turnovers_won,turnovers
 2025_21_LA_SEA,2025,21,LA,SEA,away,0,0,0,0,0,0,0
 2025_22_SEA_NE,2025,22,NE,SEA,neutral,-3,0,3,0,0,2,1
 2025_22_SEA_NE,2025,22,SEA,NE,neutral,3,3,0,2,1,0,0
+2026_01_NE_SEA,2026,1,SEA,NE,home,3,3,0,3,0,0,0
+2026_01_NE_SEA,2026,1,NE,SEA,away,-3,0,3,0,0,3,0
+2026_01_SF_LA,2026,1,LA,SF,neutral,-1,1,2,1,0,1,1
+2026_01_SF_LA,2026,1,SF,LA,neutral,1,2,1,1,1,1,0
