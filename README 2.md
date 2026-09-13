@@ -38,8 +38,8 @@ You can install the development version of nflendzonePipeline from
 [GitHub](https://github.com/) with:
 
 ``` r
-# install.packages("pak")
-pak::pak("TylerPollard410/nflendzonePipeline")
+# install.packages("remotes")
+remotes::install_github("TylerPollard410/nflendzonePipeline")
 ```
 
 # Weekly Report
