@@ -33,7 +33,8 @@ jobs:
             libpng-dev \
             libtiff5-dev \
             libjpeg-dev \
-            libmagick++-dev
+            libmagick++-dev \
+            libuv1-dev
           # Toolchain needed for source builds like arrow (keep gfortran optional)
           sudo apt-get install -y --no-install-recommends \
             build-essential \
