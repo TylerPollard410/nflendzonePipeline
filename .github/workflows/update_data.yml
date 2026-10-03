@@ -42,14 +42,36 @@ jobs:
           ))'
           Rscript -e 'install.packages(".", repos = NULL, type = "source")'
 
+      # artifacts/data-archive/ is not tracked in git (it bloated the repo history).
+      # Restore the prior full-archive .rds files from nflendzoneData releases so
+      # the ETL can run incrementally. Missing assets are skipped (full rebuild).
+      - name: Restore prior data archive from releases
+        run: |
+          Rscript - <<'RSCRIPT'
+          repo <- "TylerPollard410/nflendzoneData"
+          tags <- c(
+            "nfl_stats_week_team_regpost", "nfl_stats_week_player_regpost",
+            "nfl_stats_season_team_regpost", "nfl_stats_season_player_regpost",
+            "season_standings", "weekly_standings", "elo", "srs", "epa",
+            "scores", "series", "turnover", "redzone",
+            "team_features", "game_features", "team_model", "game_model"
+          )
+          for (tag in tags) {
+            dest <- file.path("artifacts", "data-archive", tag)
+            dir.create(dest, recursive = TRUE, showWarnings = FALSE)
+            tryCatch(
+              piggyback::pb_download(
+                file = paste0(tag, ".rds"),
+                dest = dest,
+                repo = repo,
+                tag = tag,
+                overwrite = TRUE
+              ),
+              error = function(e) message("Could not restore ", tag, ": ", conditionMessage(e))
+            )
+          }
+          RSCRIPT
+
       - name: Run ETL pipeline
         run: |
           Rscript data-raw/update_all_data.R ${{ github.event.inputs.full_build }}
-
-      - name: Commit and push updated artifacts/data-archive/ to pipeline repo
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add artifacts/data-archive/
-          git commit -m "Update artifacts [skip ci] $(TZ='America/New_York' date '+%Y-%m-%d %H:%M %Z')" || echo "No changes to commit"
-          git push origin HEAD

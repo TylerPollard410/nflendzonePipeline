@@ -4,6 +4,7 @@
 .Ruserdata
 .DS_Store
 artifacts/model-archive/
+artifacts/data-archive/
 inst/doc
 **/.quarto/
 .vscode/
